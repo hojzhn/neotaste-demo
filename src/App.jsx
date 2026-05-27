@@ -526,24 +526,34 @@ function App() {
   return (
     <>
       {/* Desktop / wide-viewport layout — two phones side by side
-          with the bezels. Hidden on phones. */}
-      <main className="hidden md:flex min-h-screen w-full flex-col items-center justify-start py-12 px-6 gap-10">
-        <header className="max-w-3xl text-center space-y-2" />
-        <div className="flex flex-wrap items-start justify-center gap-12">
-          <PhoneFrame
-            user={arabel}
-            role="User A"
-            statusBarDark={statusBarToneByUserId[arabel.id] === "dark"}
-          >
-            <BookingsScreen {...bookingsScreenPropsFor(arabel)} />
-          </PhoneFrame>
-          <PhoneFrame
-            user={hicks}
-            role="User B"
-            statusBarDark={statusBarToneByUserId[hicks.id] === "dark"}
-          >
-            <BookingsScreen {...bookingsScreenPropsFor(hicks)} />
-          </PhoneFrame>
+          with the bezels. Hidden on phones. The fixed wrapper owns
+          the vertical scrolling so body can stay overflow:hidden and
+          the centred Modal / Loader overlays never get shoved by a
+          document scrollbar. Inner `width: 100vw` lets the content
+          centre to the viewport while the wrapper's scrollbar sits
+          at the true right edge. */}
+      <main className="hidden md:block fixed inset-0 overflow-y-auto overflow-x-hidden">
+        <div
+          className="min-h-full flex flex-col items-center justify-start py-12 px-6 gap-10"
+          style={{ width: "100vw" }}
+        >
+          <header className="max-w-3xl text-center space-y-2" />
+          <div className="flex flex-wrap items-start justify-center gap-12">
+            <PhoneFrame
+              user={arabel}
+              role="User A"
+              statusBarDark={statusBarToneByUserId[arabel.id] === "dark"}
+            >
+              <BookingsScreen {...bookingsScreenPropsFor(arabel)} />
+            </PhoneFrame>
+            <PhoneFrame
+              user={hicks}
+              role="User B"
+              statusBarDark={statusBarToneByUserId[hicks.id] === "dark"}
+            >
+              <BookingsScreen {...bookingsScreenPropsFor(hicks)} />
+            </PhoneFrame>
+          </div>
         </div>
       </main>
 

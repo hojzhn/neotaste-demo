@@ -48,8 +48,8 @@ body {
   background: #f3f4f6;
   /* Belt-and-braces lock-down for iOS Safari, which sometimes ignores
      overscroll-behavior on the document. The body has nothing to
-     scroll anyway — every page lives inside fixed-positioned phone
-     frames. */
+     scroll anyway — both layouts use fixed-positioned wrappers that
+     manage their own internal scrolling. */
   overflow: hidden;
   overscroll-behavior: none;
   -webkit-overflow-scrolling: auto;

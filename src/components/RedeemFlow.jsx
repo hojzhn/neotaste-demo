@@ -253,7 +253,7 @@ function TicketStep({
         </AnimatePresence>
       </div>
 
-      <div className="flex-1 overflow-y-auto no-scrollbar px-5 pt-3 pb-4 flex flex-col justify-center">
+      <div className="flex-1 overflow-y-auto no-scrollbar px-5 pt-3 pb-2 md:pb-4 flex flex-col justify-center">
         <motion.article
           layout
           transition={{
@@ -275,7 +275,7 @@ function TicketStep({
             isRedeemed ? "bg-brand" : "bg-white",
           )}
         >
-          <div className="relative aspect-[16/9]">
+          <div className="relative aspect-[21/9] [@media(max-height:720px)]:aspect-3/1 md:aspect-video">
             <img
               src={restaurant.image}
               alt=""
@@ -310,17 +310,17 @@ function TicketStep({
             )}
           </div>
 
-          <div className="px-5 pt-4 pb-5">
-            <h2 className="text-[22px] font-bold text-ink leading-tight">
+          <div className="px-5 pt-3 pb-3 [@media(max-height:720px)]:pt-2 [@media(max-height:720px)]:pb-2 md:pt-4 md:pb-5">
+            <h2 className="text-[18px] [@media(max-height:720px)]:text-[15px] md:text-[22px] font-bold text-ink leading-tight">
               {restaurant.name}
             </h2>
             {restaurant.address && (
-              <p className="text-[14px] text-ink-muted mt-1">
+              <p className="text-[13px] [@media(max-height:720px)]:text-[12px] md:text-[14px] text-ink-muted mt-1">
                 {restaurant.address}
               </p>
             )}
-            <div className="border-t border-black/10 my-4" />
-            <h3 className="text-[24px] font-bold text-ink leading-tight">
+            <div className="border-t border-black/10 my-3 [@media(max-height:720px)]:my-2 md:my-4" />
+            <h3 className="text-[20px] [@media(max-height:720px)]:text-[16px] md:text-[24px] font-bold text-ink leading-tight">
               {deal.title}
             </h3>
           </div>
@@ -346,7 +346,7 @@ function TicketStep({
             />
           </motion.div>
 
-          <motion.div layout className="px-5 pt-5 pb-5">
+          <motion.div layout className="px-5 pt-3 pb-3 [@media(max-height:720px)]:pt-2 [@media(max-height:720px)]:pb-2 md:pt-5 md:pb-5">
             {/* Two genuinely different-height variants: pre-redeem is a 3-line
                 row (the VALID time is constrained to wrap onto two lines so
                 the right column is taller than the left), post-redeem is a
@@ -405,7 +405,7 @@ function TicketStep({
             </AnimatePresence>
             <motion.div
               layout="position"
-              className="border-t border-black/10 my-4"
+              className="border-t border-black/10 my-3 [@media(max-height:720px)]:my-2 md:my-4"
             />
             <motion.p layout="position" className="text-[14px] text-ink-muted">
               {formatLongDate(liveNow)}
@@ -422,7 +422,7 @@ function TicketStep({
       <motion.div
         layout
         transition={{ layout: { duration: 0.55, ease: [0.32, 0.72, 0, 1] } }}
-        className="px-5 pb-5 pt-2 shrink-0"
+        className="px-5 pb-2 pt-2 md:pb-5 shrink-0"
       >
         <AnimatePresence mode="popLayout" initial={false}>
           {isRedeemed ? (
@@ -432,7 +432,7 @@ function TicketStep({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
-              className="flex flex-col items-center gap-4"
+              className="flex flex-col items-center gap-3 md:gap-4"
             >
               <h3 className="text-[18px] font-bold text-ink">{c.saveTitle}</h3>
               <SavingsStepper value={savings} onChange={onChangeSavings} />

@@ -108,7 +108,7 @@ export function Toast({
   const title = titleFn(who);
 
   return (
-    <div className="absolute top-12 inset-x-3 z-50 animate-[slidedown_220ms_ease-out]">
+    <div className="absolute top-1 md:top-12 inset-x-3 z-50 animate-[slidedown_220ms_ease-out]">
       <div className="bg-brand-darker text-white rounded-md shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] p-3 flex items-center gap-3">
         {isReceived ? (
           <ReceivedIcon fromUser={fromUser} type={type} />
