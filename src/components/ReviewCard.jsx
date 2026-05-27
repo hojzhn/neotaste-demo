@@ -1,21 +1,47 @@
-import { Star, Heart } from 'lucide-react'
-import { Avatar } from './Avatar'
-import { copy } from '../copy'
+import clsx from "clsx";
+import { Star, Heart } from "lucide-react";
+import { Avatar } from "./Avatar";
+import { usersById } from "../data/users";
+import { copy } from "../copy";
 
-export function ReviewCard({ review }) {
-  const { reviewer, rating, text, daysAgo, photos = [], likes } = review
+export function ReviewCard({ review, onOpenUser }) {
+  const { userId, rating, text, ageDays, photos = [], likes } = review;
+  const reviewer = usersById[userId];
+  if (!reviewer) return null;
+
+  const avatarClickable = !!onOpenUser;
+
   return (
     <article className="py-4 border-b border-black/5">
       <div className="flex items-center gap-3">
-        <Avatar
-          initials={reviewer.initials}
-          color={reviewer.avatarColor}
-          size={36}
-        />
+        <button
+          type="button"
+          onClick={avatarClickable ? () => onOpenUser(userId) : undefined}
+          disabled={!avatarClickable}
+          className={clsx(
+            "rounded-full shrink-0",
+            avatarClickable && "active:scale-95 transition",
+          )}
+        >
+          <Avatar
+            initials={reviewer.initials}
+            color={reviewer.avatarColor}
+            image={reviewer.avatarImage}
+            size={36}
+          />
+        </button>
         <div className="flex-1 min-w-0">
-          <p className="text-[15px] font-bold text-ink truncate">
+          <button
+            type="button"
+            onClick={avatarClickable ? () => onOpenUser(userId) : undefined}
+            disabled={!avatarClickable}
+            className={clsx(
+              "block text-left text-[15px] font-bold text-ink truncate",
+              avatarClickable && "hover:underline",
+            )}
+          >
             {reviewer.name}
-          </p>
+          </button>
           <div className="flex items-center gap-2 mt-0.5">
             <span className="flex items-center gap-0.5">
               {[1, 2, 3, 4, 5].map((i) => (
@@ -23,15 +49,16 @@ export function ReviewCard({ review }) {
                   key={i}
                   className={
                     i <= rating
-                      ? 'w-3.5 h-3.5 fill-ink text-ink'
-                      : 'w-3.5 h-3.5 fill-surface-strong text-surface-strong'
+                      ? "w-3.5 h-3.5 fill-ink text-ink"
+                      : "w-3.5 h-3.5 fill-surface-strong text-surface-strong"
                   }
+                  strokeWidth={0}
                 />
               ))}
             </span>
             <span className="text-[12px] text-ink-muted">·</span>
             <span className="text-[12px] text-ink-muted">
-              {copy.detailPage.timeAgo(daysAgo)}
+              {copy.detailPage.timeAgo(ageDays)}
             </span>
           </div>
         </div>
@@ -57,5 +84,5 @@ export function ReviewCard({ review }) {
         <span>{likes}</span>
       </div>
     </article>
-  )
+  );
 }

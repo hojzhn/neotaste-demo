@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell } from "lucide-react";
-import { StatusBar } from "../components/StatusBar";
+import { usePushPhoneChrome } from "../components/PhoneFrame";
+import { SlideInOverlay } from "../components/SlideInOverlay";
 import { TabBar } from "../components/TabBar";
 import { SubTabs } from "../components/SubTabs";
 import { BookingCard } from "../components/BookingCard";
@@ -14,15 +14,28 @@ import { PhoneEntry } from "../components/PhoneEntry";
 import { PendingInvitationCard } from "../components/PendingInvitationCard";
 import { NotificationsScreen } from "../components/NotificationsScreen";
 import { RestaurantDetailPage } from "../components/RestaurantDetailPage";
+import { UserDetailPage } from "../components/UserDetailPage";
+import { ListDetailPage } from "../components/ListDetailPage";
+import { MyProfileScreen } from "./MyProfileScreen";
 import { RedeemFlow } from "../components/RedeemFlow";
+import { RecommendationSentView } from "../components/RecommendationSentView";
+import { WriteReviewSheet } from "../components/WriteReviewSheet";
 import { Toast } from "../components/Toast";
+import { DiscoverScreen } from "./DiscoverScreen";
 import { copy } from "../copy";
 import { bookings as seedBookings } from "../data/bookings";
 import { restaurantsById } from "../data/restaurants";
 import { deals as allDeals, dealsById } from "../data/deals";
 import { usersById } from "../data/users";
 import { recommendationsByDealId } from "../data/recommendations";
+import { lists } from "../data/lists";
 import { MAX_CREW } from "../lib/constants";
+
+// Master tab order matches the TabBar visual order (Discover sits left
+// of Bookings; Profile sits right of it). Each panel's animate.x is
+// computed as (panelIndex - activeIndex) * 100% so the three panels
+// slide as a single horizontal track.
+const MASTER_TABS = ["discover", "bookings", "profile"];
 
 const SUBTABS = [
   { id: "upcoming", label: copy.bookings.upcoming },
@@ -42,6 +55,10 @@ export function BookingsScreen({
   onDeclineShare,
   onCreateBooking,
   onRedeemBooking,
+  onSaveReview,
+  bookmarkedListIds = [],
+  onToggleListBookmark,
+  onSetStatusBarTone,
   interactive = true,
 }) {
   // flow = null | { booking, type: 'gift' | 'dine', step: 'pick' | 'message', friends?: User[] }
@@ -49,17 +66,75 @@ export function BookingsScreen({
   const [toast, setToast] = useState(null);
   const [scrolled, setScrolled] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  // Which master tab the notifications screen was launched from. Captured
+  // when the bell is tapped so the overlay renders inside that tab's
+  // panel and slides along with it during master-tab swaps.
+  const [notificationsOrigin, setNotificationsOrigin] = useState("bookings");
   const [detailRestaurantId, setDetailRestaurantId] = useState(null);
+  const [detailUserId, setDetailUserId] = useState(null);
+  const [detailListId, setDetailListId] = useState(null);
   const [redeemingBookingId, setRedeemingBookingId] = useState(null);
   const [activeSubTab, setActiveSubTab] = useState("upcoming");
+  // Root tab the user is currently on. Lives alongside detailUserId so the
+  // user's own profile feels like a top-level tab swap (bookings slides
+  // left, profile slides in from the right at the same time) while
+  // *other* users' profiles still ride in as a stacked overlay.
+  const [rootView, setRootView] = useState("bookings");
+  const isOnProfile = rootView === "profile";
+  const isOnBookings = rootView === "bookings";
+  const isOnDiscover = rootView === "discover";
+  const activeTabIndex = MASTER_TABS.indexOf(rootView);
+  function panelOffset(panelView) {
+    return `${(MASTER_TABS.indexOf(panelView) - activeTabIndex) * 100}%`;
+  }
+  // Overlays (RestaurantDetail / UserDetail / Notifications) are
+  // SlideInOverlay panels — they translate left along with the Bookings
+  // tab when the user swaps to Profile, so the visual feeling is "the
+  // overlay + the bookings page leave together, profile arrives." When
+  // the user taps Bookings from Profile and an overlay is still open we
+  // need to close it AND swap the tab at the same time; the overlay's
+  // exit would otherwise sweep across the entire screen, so this flag
+  // forces a zero-duration exit for that one frame.
+  const [snapCloseOverlays, setSnapCloseOverlays] = useState(false);
+  const [recommendDetailsBookingId, setRecommendDetailsBookingId] =
+    useState(null);
+  const [reviewingBookingId, setReviewingBookingId] = useState(null);
+  // The review sheet has two steps (rate → recommend). Opening it from
+  // the star/body affordances starts at "rate"; opening from the
+  // ThumbsUp button when there's no recommendation yet jumps straight
+  // to "recommend".
+  const [reviewingInitialStep, setReviewingInitialStep] = useState("rate");
+
+  function openReviewSheet(bookingId, step = "rate") {
+    setReviewingBookingId(bookingId);
+    setReviewingInitialStep(step);
+  }
   const seenShareIdsRef = useRef(new Set());
+  // Ref to the main bookings scroll container so the Bookings tab in the
+  // bottom nav can smooth-scroll back to the top when the user re-taps it
+  // while already on the bookings page.
+  const scrollContainerRef = useRef(null);
+
+  const recommendDetailsShares = recommendDetailsBookingId
+    ? (bookings.find((b) => b.id === recommendDetailsBookingId)
+        ?.sentRecommendations ?? [])
+    : [];
+
+  const reviewingBooking = reviewingBookingId
+    ? bookings.find((b) => b.id === reviewingBookingId)
+    : null;
+  const reviewingRestaurant = reviewingBooking
+    ? restaurantsById[dealsById[reviewingBooking.dealId]?.restaurantId]
+    : null;
 
   // Filter bookings by the active sub-tab. Anything redeemed gets its status
   // flipped to "history" upstream by App.jsx, so the simple status check
   // covers both newly-redeemed and any pre-seeded history items.
   const visibleBookings = bookings.filter((b) => {
     const status = b.status ?? "upcoming";
-    return activeSubTab === "history" ? status === "history" : status !== "history";
+    return activeSubTab === "history"
+      ? status === "history"
+      : status !== "history";
   });
 
   // Group history bookings under monthly headers ("March 2026"). Newest
@@ -77,7 +152,12 @@ export function BookingsScreen({
         year: "numeric",
       });
       if (!map.has(key)) {
-        map.set(key, { key, label, sortKey: d.getFullYear() * 12 + d.getMonth(), items: [] });
+        map.set(key, {
+          key,
+          label,
+          sortKey: d.getFullYear() * 12 + d.getMonth(),
+          items: [],
+        });
       }
       map.get(key).items.push(b);
     }
@@ -93,8 +173,49 @@ export function BookingsScreen({
   const redeemingRestaurant = redeemingDeal
     ? restaurantsById[redeemingDeal.restaurantId]
     : null;
+  // Merge static recommendation seed data with live recommend-shares so a
+  // recommendation that was actually sent in-app (Hicks → Arabel, for
+  // example) shows up alongside the demo seed entries on the recipient's
+  // deal card. Keyed by dealId, mirroring the shape of the imported
+  // `recommendationsByDealId` so RestaurantDetailPage's existing logic
+  // works unchanged.
+  const recommendationsByDealIdForViewer = useMemo(() => {
+    const merged = { ...recommendationsByDealId };
+    for (const s of shares) {
+      if (s.type !== "recommend" || !s.dealId) continue;
+      const entry = {
+        dealId: s.dealId,
+        userId: s.fromUserId,
+        targetUserId: s.toUserId,
+        message: s.message,
+        createdAt: s.createdAt,
+      };
+      merged[s.dealId] = [...(merged[s.dealId] ?? []), entry];
+    }
+    return merged;
+  }, [shares]);
+
+  // Recommendations are directed at a specific friend (`targetUserId`).
+  // The thanks avatars on the rate sheet should only show people who
+  // actually recommended this deal *to* the current viewer, never the
+  // viewer themselves, and never recommendations the viewer has already
+  // "consumed" by redeeming this deal on a previous booking — same
+  // rationale as the deal-card chip filtering: once a rec has driven a
+  // visit, it shouldn't keep surfacing on later visits to the same spot.
   const redeemingRecommenders = redeemingDeal
-    ? (recommendationsByDealId[redeemingDeal.id] ?? [])
+    ? (recommendationsByDealIdForViewer[redeemingDeal.id] ?? [])
+        .filter((r) => r.targetUserId === user.id && r.userId !== user.id)
+        .filter((r) => {
+          const recAt = r.createdAt ?? 0;
+          return !bookings.some(
+            (b) =>
+              b.dealId === redeemingDeal.id &&
+              b.id !== redeemingBookingId &&
+              b.status === "history" &&
+              b.outcome === "redeemed" &&
+              (b.redeemedAt ?? b.lastActivity ?? 0) > recAt,
+          );
+        })
         .map((r) => {
           const u = usersById[r.userId];
           return u ? { ...u, message: r.message } : null;
@@ -105,6 +226,49 @@ export function BookingsScreen({
   const detailRestaurant = detailRestaurantId
     ? restaurantsById[detailRestaurantId]
     : null;
+  // detailUser is *only* used for the stacked overlay covering other
+  // users' profiles. Tapping your own avatar from anywhere is routed
+  // through openUserProfile below, which flips rootView instead.
+  const detailUser =
+    detailUserId && detailUserId !== user.id ? usersById[detailUserId] : null;
+
+  function closeAllOverlays() {
+    setDetailRestaurantId(null);
+    setDetailUserId(null);
+    setDetailListId(null);
+    setNotificationsOpen(false);
+    setRecommendDetailsBookingId(null);
+    setReviewingBookingId(null);
+  }
+
+  function openUserProfile(userId) {
+    if (!userId) return;
+    if (userId === user.id) {
+      // Tapping your own avatar from any avatar surface switches to the
+      // Profile tab rather than stacking your own profile as an overlay.
+      closeAllOverlays();
+      setRootView("profile");
+    } else {
+      setDetailUserId(userId);
+    }
+  }
+  const detailList = detailListId
+    ? lists.find((l) => l.id === detailListId)
+    : null;
+
+  // Restaurants the viewer has actually visited (redeemed a booking at).
+  // Used by ListDetailPage to dim the thumbnail + show a "Visited" check on
+  // entries the viewer has been to.
+  const visitedRestaurantIds = useMemo(() => {
+    const set = new Set();
+    for (const b of bookings) {
+      if (b.status === "history" && b.outcome === "redeemed") {
+        const deal = dealsById[b.dealId];
+        if (deal?.restaurantId) set.add(deal.restaurantId);
+      }
+    }
+    return set;
+  }, [bookings]);
   const detailDeals = detailRestaurantId
     ? allDeals.filter((d) => d.restaurantId === detailRestaurantId)
     : [];
@@ -133,8 +297,7 @@ export function BookingsScreen({
         const deal = dealId ? dealsById[dealId] : null;
         const restaurant = deal ? restaurantsById[deal.restaurantId] : null;
         if (!deal || !restaurant) return null;
-        const otherUserId =
-          s.toUserId === user.id ? s.fromUserId : s.toUserId;
+        const otherUserId = s.toUserId === user.id ? s.fromUserId : s.toUserId;
         const otherUser = otherUserId ? usersById[otherUserId] : null;
         const role = s.toUserId === user.id ? "received" : "sent";
         return { share: s, booking, deal, restaurant, otherUser, role };
@@ -147,7 +310,16 @@ export function BookingsScreen({
       );
   }, [shares, user.id]);
 
-  const hasNotifications = notifications.length > 0;
+  // Timestamp of the last bell tap. Anything newer than this is "unread"
+  // and lights the red dot on the bell. Tapping the bell again refreshes
+  // the timestamp, so the badge clears and only re-lights when a fresh
+  // share arrives. Starts at 0 so the seed data does light the badge on
+  // first load.
+  const [notificationsSeenAt, setNotificationsSeenAt] = useState(0);
+  const hasNotifications = notifications.some((n) => {
+    const ts = n.share.lastUpdatedAt ?? n.share.createdAt ?? 0;
+    return ts > notificationsSeenAt;
+  });
 
   function handleScroll(e) {
     setScrolled(e.currentTarget.scrollTop > 50);
@@ -169,7 +341,8 @@ export function BookingsScreen({
         (s.type === "gift" ||
           s.type === "dine" ||
           s.type === "thank" ||
-          s.type === "recommend"),
+          s.type === "recommend" ||
+          s.type === "redeemed"),
     );
     if (incoming) {
       const sender = usersById[incoming.fromUserId];
@@ -178,6 +351,7 @@ export function BookingsScreen({
           kind: "received",
           type: incoming.type,
           who: sender.name,
+          fromUser: sender,
           message: incoming.message,
         });
       }
@@ -193,7 +367,7 @@ export function BookingsScreen({
         const s = filtered[0];
         return s.toUserId
           ? (usersById[s.toUserId]?.name ?? null)
-          : s.toPhone ?? null;
+          : (s.toPhone ?? null);
       }
       return copy.toast.peopleCount(filtered.length);
     }
@@ -287,157 +461,462 @@ export function BookingsScreen({
     flow?.type === "gift" ? copy.picker.giftSubtitle : copy.picker.dineSubtitle;
   const pickerMode = flow?.type === "gift" ? "single" : "multi";
 
+  // Overlay visibility is computed per-tab: an overlay rendered inside a
+  // master tab that's currently swapped off-screen doesn't count for the
+  // active chrome. Notifications follows wherever the user opened it
+  // from; the deep page overlays (restaurant / user detail) are always
+  // anchored to Bookings because they're only reachable from there.
+  // Discover currently has no overlays of its own.
+  const notificationsOnActive =
+    notificationsOpen && notificationsOrigin === rootView;
+  const bookingsDeepOverlayOpen = !!detailRestaurantId || !!detailUserId;
+  const hasOverlayOnActiveTab =
+    notificationsOnActive || (isOnBookings && bookingsDeepOverlayOpen);
+
+  // Top-level back handler. Pops whichever slide-in overlay is currently
+  // visible on the active tab; hidden when nothing is up. ListDetail is
+  // excluded (it's a BottomSheet — dismisses via drag / backdrop).
+  // RestaurantDetailPage overrides this for its nested BookingConfirmation
+  // by pushing its own handler.
+  const phoneBack = useMemo(() => {
+    if (notificationsOnActive) return () => setNotificationsOpen(false);
+    if (isOnBookings) {
+      if (detailUserId) return () => setDetailUserId(null);
+      if (detailRestaurantId) return () => setDetailRestaurantId(null);
+    }
+    return null;
+  }, [notificationsOnActive, isOnBookings, detailUserId, detailRestaurantId]);
+  usePushPhoneChrome("back", phoneBack);
+
+  function openNotifications() {
+    setNotificationsOrigin(rootView);
+    setNotificationsOpen(true);
+    setNotificationsSeenAt(Date.now());
+  }
+
+  // Bell shows on Bookings and Profile root tabs when nothing's on top
+  // of the active tab. Discover gets no bell — its top chrome is the
+  // search bar + filter chips, and adding a floating bell on top reads
+  // as cluttered. Two Y positions on Bookings: low (≈84px) under the
+  // big "Bookings" headline while it's still in view, high (≈48px)
+  // otherwise. PhoneFrame animates between them.
+  const phoneBell = useMemo(() => {
+    if (hasOverlayOnActiveTab) return null;
+    if (isOnDiscover) return null;
+    const position = isOnBookings && !scrolled ? "low" : "high";
+    return {
+      onClick: openNotifications,
+      hasNotifications,
+      position,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    hasOverlayOnActiveTab,
+    hasNotifications,
+    isOnBookings,
+    isOnDiscover,
+    scrolled,
+  ]);
+  usePushPhoneChrome("bell", phoneBell);
+
   return (
-    <div className="w-full h-full flex flex-col bg-white relative">
-      <StatusBar />
-
-      {/* Compact title — fades + un-blurs in once the large title has scrolled past the threshold. */}
-      <div
-        className={clsx(
-          "absolute top-11 inset-x-0 z-20 transition-opacity duration-300 ease-out",
-          scrolled ? "opacity-100" : "opacity-0 pointer-events-none",
-        )}
-      >
-        <div className="bg-white backdrop-blur-md py-3 px-6 border-b border-black/5">
-          <h2
-            className={clsx(
-              "text-center text-[17px] font-bold text-ink transition duration-300 ease-out",
-              scrolled ? "blur-none" : "blur-md",
-            )}
+    <div className="w-full h-full flex flex-col bg-white relative overflow-hidden">
+      {/* Discover tab — bleeds all the way to the top of the phone
+          (the map sits behind the status bar by design). The other
+          master tabs start at top-11; this one fills the full height
+          above the TabBar so the map can extend behind the global
+          StatusBar overlay. */}
+      <AnimatePresence initial={false}>
+        {isOnDiscover && (
+          <motion.div
+            key="discover-panel"
+            initial={{ x: "-100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "-100%" }}
+            transition={{ type: "spring", stiffness: 380, damping: 36 }}
+            className="absolute inset-x-0 top-0 bottom-20 bg-white"
           >
-            {copy.bookings.title}
-          </h2>
-        </div>
-      </div>
-
-      {/* Bell button — sits next to the large title row, animates up to top-right when scrolled. */}
-      <motion.button
-        type="button"
-        onClick={() => setNotificationsOpen(true)}
-        aria-label={copy.notifications.button}
-        initial={false}
-        animate={{ top: scrolled ? 48 : 84 }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
-        className="absolute right-4 z-30 w-10 h-10 rounded-full bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.15)] border border-black/5 flex items-center justify-center hover:bg-surface active:scale-95 transition-[background,transform]"
-      >
-        <Bell className="w-5 h-5 text-ink" strokeWidth={2.25} />
-        {hasNotifications && (
-          <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-error ring-2 ring-white" />
+            <DiscoverScreen
+              user={user}
+              bookmarkedListIds={bookmarkedListIds}
+              visitedRestaurantIds={visitedRestaurantIds}
+              onToggleListBookmark={onToggleListBookmark}
+              recommendationsByDealIdForViewer={
+                recommendationsByDealIdForViewer
+              }
+            />
+          </motion.div>
         )}
-      </motion.button>
+      </AnimatePresence>
 
-      <div
-        onScroll={handleScroll}
-        className="flex-1 overflow-y-auto no-scrollbar"
+      {/* Bookings tab — middle panel. Its own sliding panel that ships
+          left when Profile is active, right when Discover is active.
+          Pairs with the own-profile + discover panels so the three
+          move together like a paged tab swap. */}
+      <motion.div
+        animate={{ x: panelOffset("bookings") }}
+        transition={{ type: "spring", stiffness: 380, damping: 36 }}
+        className="absolute inset-x-0 top-11 bottom-20 flex flex-col"
       >
-        <div className="px-6 pt-16 pb-4">
-          <h1 className="text-[32px] font-bold text-ink leading-tight">
-            {copy.bookings.title}
-          </h1>
-        </div>
-        <SubTabs
-          tabs={SUBTABS}
-          active={activeSubTab}
-          onChange={interactive ? setActiveSubTab : undefined}
-        />
-        <div className="px-4 pt-5 pb-24 space-y-5">
-          {activeSubTab === "upcoming" && pendingInvitations.length > 0 && (
-            <section className="space-y-2">
-              <h2 className="px-2 text-[12px] font-semibold uppercase tracking-wide text-ink-muted">
-                {copy.invitations.sectionTitle}
-              </h2>
-              {pendingInvitations.map((inv) => (
-                <PendingInvitationCard
-                  key={inv.share.id}
-                  share={inv.share}
-                  sender={inv.sender}
-                  deal={inv.deal}
-                  restaurant={inv.restaurant}
-                  onAccept={
-                    interactive
-                      ? () => onAcceptShare?.(inv.share.id)
-                      : undefined
-                  }
-                  onDecline={
-                    interactive
-                      ? () => onDeclineShare?.(inv.share.id)
-                      : undefined
-                  }
-                />
-              ))}
-            </section>
+        {/* Compact title — fades + un-blurs in once the large title has scrolled past the threshold. */}
+        <div
+          className={clsx(
+            "absolute top-0 inset-x-0 z-20 transition-opacity duration-300 ease-out",
+            scrolled ? "opacity-100" : "opacity-0 pointer-events-none",
           )}
+        >
+          <div className="bg-white backdrop-blur-md py-3 px-6 border-b border-black/5">
+            <h2
+              className={clsx(
+                "text-center text-[17px] font-bold text-ink transition duration-300 ease-out",
+                scrolled ? "blur-none" : "blur-md",
+              )}
+            >
+              {copy.bookings.title}
+            </h2>
+          </div>
+        </div>
 
-          {activeSubTab === "history" ? (
-            historyGroups.length === 0 ? (
-              <p className="text-center text-ink-muted mt-10 px-6">
-                {copy.bookings.historyEmpty}
+        {/* Bell lives at PhoneFrame level now; the bookings panel just
+            renders its content. */}
+
+        <div
+          ref={scrollContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto no-scrollbar"
+        >
+          <div className="px-6 pt-16 pb-4">
+            <h1 className="text-[32px] font-bold text-ink leading-tight">
+              {copy.bookings.title}
+            </h1>
+          </div>
+          <SubTabs
+            tabs={SUBTABS}
+            active={activeSubTab}
+            onChange={interactive ? setActiveSubTab : undefined}
+          />
+          <div className="px-4 pt-5 pb-24 space-y-5">
+            {activeSubTab === "upcoming" && pendingInvitations.length > 0 && (
+              <section className="space-y-2">
+                <h2 className="px-2 text-[12px] font-semibold uppercase tracking-wide text-ink-muted">
+                  {copy.invitations.sectionTitle}
+                </h2>
+                {pendingInvitations.map((inv) => (
+                  <PendingInvitationCard
+                    key={inv.share.id}
+                    share={inv.share}
+                    sender={inv.sender}
+                    deal={inv.deal}
+                    restaurant={inv.restaurant}
+                    onAccept={
+                      interactive
+                        ? () => onAcceptShare?.(inv.share.id)
+                        : undefined
+                    }
+                    onDecline={
+                      interactive
+                        ? () => onDeclineShare?.(inv.share.id)
+                        : undefined
+                    }
+                  />
+                ))}
+              </section>
+            )}
+
+            {activeSubTab === "history" ? (
+              historyGroups.length === 0 ? (
+                <p className="text-center text-ink-muted mt-10 px-6">
+                  {copy.bookings.historyEmpty}
+                </p>
+              ) : (
+                historyGroups.map((group) => (
+                  <section key={group.key} className="space-y-3">
+                    <h2 className="px-2 text-[18px] font-bold text-ink">
+                      {group.label}
+                    </h2>
+                    {group.items.map((booking) => {
+                      const deal = dealsById[booking.dealId];
+                      const restaurant = restaurantsById[deal.restaurantId];
+                      return (
+                        <HistoryBookingCard
+                          key={booking.id}
+                          booking={booking}
+                          deal={deal}
+                          restaurant={restaurant}
+                          onShowRecommendations={
+                            (booking.sentRecommendations?.length ?? 0) > 0
+                              ? () => setRecommendDetailsBookingId(booking.id)
+                              : undefined
+                          }
+                          onWriteReview={
+                            interactive && booking.outcome !== "cancelled"
+                              ? () => openReviewSheet(booking.id, "rate")
+                              : undefined
+                          }
+                          onWriteRecommendation={
+                            interactive && booking.outcome !== "cancelled"
+                              ? () => openReviewSheet(booking.id, "recommend")
+                              : undefined
+                          }
+                          onOpenDetail={() =>
+                            setDetailRestaurantId(restaurant.id)
+                          }
+                          onBookAgain={() =>
+                            setDetailRestaurantId(restaurant.id)
+                          }
+                        />
+                      );
+                    })}
+                  </section>
+                ))
+              )
+            ) : visibleBookings.length === 0 &&
+              pendingInvitations.length === 0 ? (
+              <p className="text-center text-ink-muted mt-10">
+                {copy.bookings.empty}
               </p>
             ) : (
-              historyGroups.map((group) => (
-                <section key={group.key} className="space-y-3">
-                  <h2 className="px-2 text-[18px] font-bold text-ink">
-                    {group.label}
-                  </h2>
-                  {group.items.map((booking) => {
-                    const deal = dealsById[booking.dealId];
-                    const restaurant = restaurantsById[deal.restaurantId];
-                    return (
-                      <HistoryBookingCard
-                        key={booking.id}
-                        booking={booking}
-                        deal={deal}
-                        restaurant={restaurant}
-                      />
-                    );
-                  })}
-                </section>
-              ))
-            )
-          ) : visibleBookings.length === 0 && pendingInvitations.length === 0 ? (
-            <p className="text-center text-ink-muted mt-10">
-              {copy.bookings.empty}
-            </p>
-          ) : (
-            visibleBookings.map((booking) => {
-              const deal = dealsById[booking.dealId];
-              const restaurant = restaurantsById[deal.restaurantId];
-              const isHistory = booking.status === "history";
-              return (
-                <BookingCard
-                  key={booking.id}
-                  booking={booking}
-                  deal={deal}
-                  restaurant={restaurant}
-                  gifter={booking.gifter}
-                  giftMessage={booking.giftMessage}
-                  crew={booking.crew}
-                  hasPendingInvites={booking.hasPendingInvites}
-                  canAddCrew={!isHistory && booking.remainingSlots > 0}
-                  canGift={!isHistory && booking.crew.length === 0}
-                  onGift={
-                    interactive && booking.crew.length === 0
-                      ? () => setFlow({ booking, type: "gift", step: "pick" })
-                      : undefined
-                  }
-                  onAddCrew={
-                    interactive && booking.remainingSlots > 0
-                      ? () => setFlow({ booking, type: "dine", step: "pick" })
-                      : undefined
-                  }
-                  onOpenDetail={() => setDetailRestaurantId(restaurant.id)}
-                  onRedeem={
-                    interactive && !isHistory
-                      ? () => setRedeemingBookingId(booking.id)
-                      : undefined
-                  }
-                />
-              );
-            })
-          )}
+              visibleBookings.map((booking) => {
+                const deal = dealsById[booking.dealId];
+                const restaurant = restaurantsById[deal.restaurantId];
+                const isHistory = booking.status === "history";
+                return (
+                  <BookingCard
+                    key={booking.id}
+                    booking={booking}
+                    deal={deal}
+                    restaurant={restaurant}
+                    gifter={booking.gifter}
+                    giftMessage={booking.giftMessage}
+                    crew={booking.crew}
+                    hasPendingInvites={booking.hasPendingInvites}
+                    canAddCrew={!isHistory && booking.remainingSlots > 0}
+                    // Gifted-in bookings can't be re-gifted onward — the
+                    // app surface treats a gifted booking as the final
+                    // recipient's, not a transferable asset.
+                    canGift={
+                      !isHistory && booking.crew.length === 0 && !booking.gifter
+                    }
+                    onGift={
+                      interactive &&
+                      booking.crew.length === 0 &&
+                      !booking.gifter
+                        ? () => setFlow({ booking, type: "gift", step: "pick" })
+                        : undefined
+                    }
+                    onAddCrew={
+                      interactive && booking.remainingSlots > 0
+                        ? () => setFlow({ booking, type: "dine", step: "pick" })
+                        : undefined
+                    }
+                    onOpenDetail={() => setDetailRestaurantId(restaurant.id)}
+                    onRedeem={
+                      interactive && !isHistory
+                        ? () => setRedeemingBookingId(booking.id)
+                        : undefined
+                    }
+                  />
+                );
+              })
+            )}
+          </div>
         </div>
-      </div>
-      <TabBar active="bookings" />
+
+        {/* Bookings-tab overlays — render INSIDE this panel so they
+            translate together with the panel when the master tab
+            swaps. Restaurant + user detail are bookings-only flows;
+            notifications appears here when its origin was the bookings
+            bell. */}
+        <SlideInOverlay
+          open={notificationsOpen && notificationsOrigin === "bookings"}
+          snapClose={snapCloseOverlays}
+          className="absolute top-0 inset-x-0 bottom-0 z-40 bg-white"
+        >
+          <NotificationsScreen
+            notifications={notifications}
+            onAcceptShare={interactive ? onAcceptShare : undefined}
+            onDeclineShare={interactive ? onDeclineShare : undefined}
+            onSeeInformation={(restaurantId) => {
+              setNotificationsOpen(false);
+              setDetailRestaurantId(restaurantId);
+            }}
+            onSeeBookings={() => {
+              setNotificationsOpen(false);
+              setActiveSubTab("upcoming");
+            }}
+            onWriteReview={(bookingId) => {
+              if (!bookingId) return;
+              setNotificationsOpen(false);
+              setActiveSubTab("history");
+              setReviewingBookingId(bookingId);
+            }}
+            onOpenUser={(userId) => {
+              setNotificationsOpen(false);
+              openUserProfile(userId);
+            }}
+          />
+        </SlideInOverlay>
+
+        <SlideInOverlay
+          open={!!detailRestaurant}
+          snapClose={snapCloseOverlays}
+          className="absolute top-0 inset-x-0 bottom-0 z-40 bg-white"
+        >
+          {detailRestaurant && (
+            <RestaurantDetailPage
+              restaurant={detailRestaurant}
+              deals={detailDeals}
+              recommendationsByDealId={recommendationsByDealIdForViewer}
+              user={user}
+              friends={friends}
+              userBookings={bookings}
+              phoneGiftsUsed={phoneGiftsUsed}
+              phoneGiftLimit={phoneGiftLimit}
+              onShare={interactive ? onShare : undefined}
+              onCreateBooking={
+                interactive
+                  ? (payload) => {
+                      onCreateBooking?.(payload);
+                      // Drop the bookings list back to the top *and*
+                      // flip back to Upcoming so the freshly-confirmed
+                      // booking is the first thing the user sees once
+                      // the detail page slides off. (If they were on
+                      // History when they opened the detail page, the
+                      // tab would otherwise stay on History and the
+                      // new booking would be invisible.)
+                      setActiveSubTab("upcoming");
+                      scrollContainerRef.current?.scrollTo({
+                        top: 0,
+                        behavior: "smooth",
+                      });
+                    }
+                  : undefined
+              }
+              onOpenUser={openUserProfile}
+              onBack={() => setDetailRestaurantId(null)}
+            />
+          )}
+        </SlideInOverlay>
+
+        <SlideInOverlay
+          open={!!detailUser}
+          snapClose={snapCloseOverlays}
+          className="absolute top-0 inset-x-0 bottom-0 z-40 bg-white"
+        >
+          {detailUser && (
+            <UserDetailPage
+              user={detailUser}
+              viewer={user}
+              bookmarkedListIds={bookmarkedListIds}
+              onToggleListBookmark={onToggleListBookmark}
+              onOpenRestaurant={(restaurantId) =>
+                setDetailRestaurantId(restaurantId)
+              }
+              onOpenList={(listId) => setDetailListId(listId)}
+            />
+          )}
+        </SlideInOverlay>
+      </motion.div>
+
+      {/* Own profile — sliding panel that sits to the right of Bookings.
+          Always mounted (just translated off-screen when inactive) so
+          coming back to it is instant. */}
+      <motion.div
+        animate={{ x: panelOffset("profile") }}
+        transition={{ type: "spring", stiffness: 380, damping: 36 }}
+        className="absolute inset-x-0 top-11 bottom-20 bg-white"
+      >
+        <MyProfileScreen
+          user={user}
+          bookmarkedListIds={bookmarkedListIds}
+          onToggleListBookmark={onToggleListBookmark}
+          onOpenRestaurant={(restaurantId) =>
+            setDetailRestaurantId(restaurantId)
+          }
+          onOpenList={(listId) => setDetailListId(listId)}
+          onOpenNotifications={openNotifications}
+          hasNotifications={hasNotifications}
+        />
+
+        {/* Profile-tab overlay — notifications opened from the mypage
+            bell renders here so it slides along with the Profile panel. */}
+        <SlideInOverlay
+          open={notificationsOpen && notificationsOrigin === "profile"}
+          snapClose={snapCloseOverlays}
+          className="absolute top-0 inset-x-0 bottom-0 z-40 bg-white"
+        >
+          <NotificationsScreen
+            notifications={notifications}
+            onAcceptShare={interactive ? onAcceptShare : undefined}
+            onDeclineShare={interactive ? onDeclineShare : undefined}
+            onSeeInformation={(restaurantId) => {
+              setNotificationsOpen(false);
+              setDetailRestaurantId(restaurantId);
+              setRootView("bookings");
+            }}
+            onSeeBookings={() => {
+              setNotificationsOpen(false);
+              setActiveSubTab("upcoming");
+              setRootView("bookings");
+            }}
+            onWriteReview={(bookingId) => {
+              if (!bookingId) return;
+              setNotificationsOpen(false);
+              setActiveSubTab("history");
+              setReviewingBookingId(bookingId);
+              setRootView("bookings");
+            }}
+            onOpenUser={(userId) => {
+              setNotificationsOpen(false);
+              openUserProfile(userId);
+            }}
+          />
+        </SlideInOverlay>
+      </motion.div>
+
+      <TabBar
+        active={rootView}
+        onSelectProfile={interactive ? () => setRootView("profile") : undefined}
+        onSelectDiscover={
+          interactive
+            ? () => {
+                // Same flow as Profile — overlays stay parked on their
+                // origin tab; tab swap is purely cosmetic. No close.
+                setRootView("discover");
+              }
+            : undefined
+        }
+        onSelectBookings={() => {
+          // Per the user spec, tapping Bookings closes any open
+          // slide-in overlay regardless of which tab spawned it (so deep
+          // navigation doesn't survive a tab tap). On a cross-tab swap
+          // we snap the overlay's exit to zero duration — otherwise it
+          // would sweep across the screen while the panel beneath is
+          // translating in from the other direction.
+          const hasAnySlideIn =
+            notificationsOpen || !!detailRestaurantId || !!detailUserId;
+          if (rootView === "bookings") {
+            if (hasAnySlideIn) {
+              closeAllOverlays();
+            } else {
+              setActiveSubTab("upcoming");
+              scrollContainerRef.current?.scrollTo({
+                top: 0,
+                behavior: "smooth",
+              });
+            }
+          } else {
+            if (hasAnySlideIn) {
+              setSnapCloseOverlays(true);
+              closeAllOverlays();
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => setSnapCloseOverlays(false));
+              });
+            }
+            setRootView("bookings");
+          }
+        }}
+      />
 
       <BottomSheet
         open={!!flow}
@@ -492,56 +971,83 @@ export function BookingsScreen({
         )}
       </BottomSheet>
 
-      <AnimatePresence>
-        {notificationsOpen && (
-          <motion.div
-            key="notifications-screen"
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", stiffness: 380, damping: 36 }}
-            className="absolute inset-0 z-40 bg-white"
-          >
-            <NotificationsScreen
-              notifications={notifications}
-              onBack={() => setNotificationsOpen(false)}
-              onAcceptShare={interactive ? onAcceptShare : undefined}
-              onDeclineShare={interactive ? onDeclineShare : undefined}
-              onSeeInformation={(restaurantId) => {
-                setNotificationsOpen(false);
-                setDetailRestaurantId(restaurantId);
-              }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <BottomSheet
+        open={!!recommendDetailsBookingId}
+        onClose={() => setRecommendDetailsBookingId(null)}
+        initialSnap="compact"
+      >
+        <RecommendationSentView
+          shares={recommendDetailsShares}
+          onOpenUser={(userId) => {
+            setRecommendDetailsBookingId(null);
+            openUserProfile(userId);
+          }}
+          onClose={() => setRecommendDetailsBookingId(null)}
+        />
+      </BottomSheet>
 
-      <AnimatePresence>
-        {detailRestaurant && (
-          <motion.div
-            key="detail-page"
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", stiffness: 380, damping: 36 }}
-            className="absolute inset-0 z-40 bg-white"
-          >
-            <RestaurantDetailPage
-              restaurant={detailRestaurant}
-              deals={detailDeals}
-              recommendationsByDealId={recommendationsByDealId}
-              user={user}
-              friends={friends}
-              userBookings={bookings}
-              phoneGiftsUsed={phoneGiftsUsed}
-              phoneGiftLimit={phoneGiftLimit}
-              onShare={interactive ? onShare : undefined}
-              onCreateBooking={interactive ? onCreateBooking : undefined}
-              onBack={() => setDetailRestaurantId(null)}
-            />
-          </motion.div>
+      <BottomSheet
+        open={!!reviewingBookingId}
+        onClose={() => setReviewingBookingId(null)}
+        initialSnap="full"
+      >
+        {reviewingBooking && reviewingRestaurant && (
+          <WriteReviewSheet
+            // Remount whenever booking *or* initial step changes so the
+            // form state re-initialises (and the step machine actually
+            // starts at the requested step instead of clinging to the
+            // previous one).
+            key={`${reviewingBookingId}-${reviewingInitialStep}`}
+            restaurant={reviewingRestaurant}
+            initialStep={reviewingInitialStep}
+            initialRating={reviewingBooking.rating ?? 0}
+            initialReview={reviewingBooking.review ?? ""}
+            hasRecommended={
+              (reviewingBooking.sentRecommendations?.length ?? 0) > 0
+            }
+            friends={friends}
+            onSubmit={({ rating, review }) =>
+              onSaveReview?.(reviewingBookingId, user.id, { rating, review })
+            }
+            onSendRecommendation={({ friends: selected, message }) => {
+              onShare?.({
+                booking: reviewingBooking,
+                deal: dealsById[reviewingBooking.dealId],
+                type: "recommend",
+                friends: selected,
+                fromUserId: user.id,
+                message,
+              });
+            }}
+            onClose={() => setReviewingBookingId(null)}
+          />
         )}
-      </AnimatePresence>
+      </BottomSheet>
+
+      {/* ListDetail is a BottomSheet — it isn't anchored to any master
+          tab so opening it from mypage or from a deeper user profile
+          both work; it stays put across tab swaps until the user drags
+          it down or taps the backdrop. */}
+      <BottomSheet
+        open={!!detailList}
+        onClose={() => setDetailListId(null)}
+        initialSnap="full"
+      >
+        {detailList && (
+          <ListDetailPage
+            list={detailList}
+            viewer={user}
+            isBookmarked={bookmarkedListIds.includes(detailList.id)}
+            onToggleBookmark={
+              onToggleListBookmark
+                ? () => onToggleListBookmark(detailList.id)
+                : undefined
+            }
+            visitedRestaurantIds={visitedRestaurantIds}
+            onClose={() => setDetailListId(null)}
+          />
+        )}
+      </BottomSheet>
 
       <AnimatePresence>
         {redeemingBooking && redeemingDeal && redeemingRestaurant && (
@@ -557,23 +1063,34 @@ export function BookingsScreen({
               booking={redeemingBooking}
               deal={redeemingDeal}
               restaurant={redeemingRestaurant}
+              viewer={user}
               gifter={redeemingBooking.gifter}
               giftMessage={redeemingBooking.giftMessage}
               recommenders={redeemingRecommenders}
               friends={friends}
               onShare={interactive ? onShare : undefined}
+              onStatusBarTone={onSetStatusBarTone}
               onRedeem={(bookingId) => {
                 // Slide-to-redeem completed: flip the booking to history
                 // immediately and switch the underlying tab so when the
                 // flow closes the user lands on History with the booking
-                // visible at the top.
-                onRedeemBooking?.(bookingId);
+                // visible at the top. Pass the viewer's id so the
+                // "redeemed your deal" fan-out gets attributed correctly
+                // for gifted bookings.
+                onRedeemBooking?.(bookingId, user.id);
                 setActiveSubTab("history");
               }}
-              onComplete={({ bookingId, savings, rating }) => {
-                // Final flow step delivers the savings + rating that the
-                // History card needs to render the saved-€ pill and stars.
-                onRedeemBooking?.(bookingId, { savings, rating });
+              onComplete={({ bookingId, savings, rating, review }) => {
+                // Final flow step. Savings is shared across the booking;
+                // rating + review belong specifically to the host (whoever
+                // ran the redeem flow), so they go into per-user reviews.
+                onRedeemBooking?.(bookingId, user.id, { savings });
+                if (rating != null) {
+                  onSaveReview?.(bookingId, user.id, {
+                    rating,
+                    review: review || null,
+                  });
+                }
               }}
               onClose={() => setRedeemingBookingId(null)}
             />
@@ -586,6 +1103,7 @@ export function BookingsScreen({
           kind={toast.kind}
           type={toast.type}
           who={toast.who}
+          fromUser={toast.fromUser}
           message={toast.message}
           onClose={() => setToast(null)}
         />

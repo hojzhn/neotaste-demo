@@ -1,8 +1,10 @@
+import clsx from 'clsx'
 import { X } from 'lucide-react'
 import { Avatar } from './Avatar'
 import { copy } from '../copy'
 
-export function RecommendationsView({ recommenders = [], onClose }) {
+export function RecommendationsView({ recommenders = [], onOpenUser, onClose }) {
+  const clickable = !!onOpenUser
   return (
     <>
       <div className="px-6 flex items-start justify-between gap-3 mb-4 shrink-0">
@@ -20,7 +22,7 @@ export function RecommendationsView({ recommenders = [], onClose }) {
           type="button"
           onClick={onClose}
           aria-label={copy.picker.close}
-          className="w-9 h-9 rounded-full bg-surface flex items-center justify-center hover:bg-surface-strong shrink-0"
+          className="w-9 h-9 rounded-lg bg-surface flex items-center justify-center hover:bg-surface-strong shrink-0"
         >
           <X className="w-5 h-5 text-ink" strokeWidth={2.5} />
         </button>
@@ -32,28 +34,38 @@ export function RecommendationsView({ recommenders = [], onClose }) {
             {copy.recommendations.empty}
           </p>
         ) : (
-          recommenders.map((r) => (
-            <div
-              key={r.id}
-              className="flex items-start gap-3 px-3 py-3"
-            >
-              <Avatar
-                initials={r.initials}
-                color={r.avatarColor}
-                size={40}
-              />
-              <div className="flex-1 min-w-0">
-                <p className="text-[15px] font-bold text-ink truncate">
-                  {r.fullName}
-                </p>
-                {r.message && (
-                  <p className="text-[13px] text-ink-muted mt-0.5 italic leading-snug">
-                    “{r.message}”
-                  </p>
+          recommenders.map((r) => {
+            const RowEl = clickable ? 'button' : 'div'
+            return (
+              <RowEl
+                key={r.id}
+                type={clickable ? 'button' : undefined}
+                onClick={clickable ? () => onOpenUser(r.id) : undefined}
+                className={clsx(
+                  'w-full text-left flex items-start gap-3 px-3 py-3 rounded-lg',
+                  clickable &&
+                    'hover:bg-surface/60 active:bg-surface transition-colors',
                 )}
-              </div>
-            </div>
-          ))
+              >
+                <Avatar
+                  initials={r.initials}
+                  color={r.avatarColor}
+                  image={r.avatarImage}
+                  size={40}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[15px] font-bold text-ink truncate">
+                    {r.fullName}
+                  </p>
+                  {r.message && (
+                    <p className="text-[13px] text-ink-muted mt-0.5 italic leading-snug">
+                      “{r.message}”
+                    </p>
+                  )}
+                </div>
+              </RowEl>
+            )
+          })
         )}
       </div>
     </>

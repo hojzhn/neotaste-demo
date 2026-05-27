@@ -18,11 +18,33 @@ function dimColor(hex, amount = 0.5) {
 export function Avatar({
   initials,
   color = "#737373",
+  image,
   size = 32,
   ring = false,
   pending = false,
   className,
 }) {
+  if (image) {
+    return (
+      <span
+        style={{ width: size, height: size }}
+        className={clsx(
+          "inline-flex items-center justify-center rounded-full overflow-hidden ",
+          ring && (pending ? "ring-2 ring-gray-300" : "ring-2 ring-white"),
+
+          className,
+        )}
+      >
+        <img
+          src={image}
+          alt=""
+          className={`w-full h-full object-cover ${pending && "contrast-70"}`}
+          draggable={false}
+        />
+      </span>
+    );
+  }
+
   const bg = pending ? dimColor(color, 0.7) : color;
 
   return (

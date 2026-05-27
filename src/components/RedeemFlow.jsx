@@ -13,8 +13,8 @@ import {
   Minus,
   Star,
   Check,
+  Gift,
 } from "lucide-react";
-import { StatusBar } from "./StatusBar";
 import { Avatar } from "./Avatar";
 import { BottomSheet } from "./BottomSheet";
 import { FriendGroupCard } from "./FriendGroupCard";
@@ -84,7 +84,7 @@ function SlideToRedeem({ onComplete }) {
   return (
     <div
       ref={trackRef}
-      className="relative w-full rounded-full bg-brand/30"
+      className="relative w-full rounded-lg bg-brand/30"
       style={{ height: TRACK_HEIGHT }}
     >
       <span
@@ -100,7 +100,7 @@ function SlideToRedeem({ onComplete }) {
         dragMomentum={false}
         onDragEnd={handleDragEnd}
         style={{ x, width: KNOB_SIZE, height: KNOB_SIZE }}
-        className="absolute top-1 left-1 rounded-full bg-brand flex items-center justify-center cursor-grab active:cursor-grabbing shadow-[0_2px_8px_-2px_rgba(0,0,0,0.2)]"
+        className="absolute top-1 left-1 rounded-lg bg-brand flex items-center justify-center cursor-grab active:cursor-grabbing shadow-[0_2px_8px_-2px_rgba(0,0,0,0.2)]"
       >
         <ChevronRight className="w-6 h-6 text-ink" strokeWidth={2.5} />
       </motion.div>
@@ -112,12 +112,12 @@ function SlideToRedeem({ onComplete }) {
 
 function SavingsStepper({ value, onChange }) {
   return (
-    <div className="inline-flex items-center gap-2 h-14 pl-2 pr-2 rounded-full bg-white shadow-[0_2px_8px_-4px_rgba(0,0,0,0.15)]">
+    <div className="inline-flex items-center gap-2 h-14 pl-2 pr-2 rounded-lg bg-white shadow-[0_2px_8px_-4px_rgba(0,0,0,0.15)]">
       <button
         type="button"
         onClick={() => onChange(Math.max(0, value - 1))}
         aria-label="Decrease"
-        className="w-10 h-10 rounded-full bg-surface text-ink flex items-center justify-center hover:bg-surface-strong active:scale-95 transition"
+        className="w-10 h-10 rounded-lg bg-surface text-ink flex items-center justify-center hover:bg-surface-strong active:scale-95 transition"
       >
         <Minus className="w-4 h-4" strokeWidth={2.5} />
       </button>
@@ -129,7 +129,7 @@ function SavingsStepper({ value, onChange }) {
         type="button"
         onClick={() => onChange(value + 1)}
         aria-label="Increase"
-        className="w-10 h-10 rounded-full bg-surface text-ink flex items-center justify-center hover:bg-surface-strong active:scale-95 transition"
+        className="w-10 h-10 rounded-lg bg-surface text-ink flex items-center justify-center hover:bg-surface-strong active:scale-95 transition"
       >
         <Plus className="w-4 h-4" strokeWidth={2.5} />
       </button>
@@ -175,6 +175,8 @@ function TicketStep({
   restaurant,
   redeemedAt,
   savings,
+  crew = [],
+  gifter,
   onSlideRedeem,
   onChangeSavings,
   onContinue,
@@ -183,6 +185,16 @@ function TicketStep({
   const isRedeemed = !!redeemedAt;
   const liveNow = useNowClock(redeemedAt ?? null);
   const c = copy.redeem;
+  // Pending invitees aren't actually at the meal — only count crew members
+  // who already accepted. Banner disappears if nobody's confirmed.
+  const acceptedCrew = crew.filter((u) => !u.pending);
+  const crewCount = acceptedCrew.length;
+  const crewMessage =
+    crewCount === 0
+      ? null
+      : crewCount === 1
+        ? c.redeemingWithOne
+        : c.redeemingWith(crewCount);
 
   return (
     <div
@@ -191,20 +203,54 @@ function TicketStep({
         isRedeemed ? "bg-white" : "bg-brand-darkest",
       )}
     >
-      <StatusBar dark={!isRedeemed} />
+      {/* StatusBar is rendered globally by PhoneFrame; it flips dark
+          while the redeem flow is in its pre-redeem state. Reserve the
+          h-11 slot here so content sits below it. */}
+      <div className="h-11 shrink-0" aria-hidden="true" />
 
-      <div className="px-4 py-2 shrink-0 flex items-center justify-between">
+      <div className="px-4 py-2 shrink-0 flex items-center gap-3">
         <button
           type="button"
           onClick={onClose}
           aria-label={c.close}
           className={clsx(
-            "w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-colors duration-450",
+            "w-10 h-10 rounded-lg flex items-center justify-center active:scale-95 transition-colors duration-450 shrink-0",
             isRedeemed ? "bg-surface hover:bg-surface-strong" : "bg-white/95",
           )}
         >
           <ChevronLeft className="w-5 h-5 text-ink" strokeWidth={2.5} />
         </button>
+        {/* Crew banner — visible on the pre-redeem screen so the user
+            understands the slide will redeem for everyone, then fades out
+            (along with the dark background) as the redemption completes. */}
+        <AnimatePresence initial={false}>
+          {crewMessage && !isRedeemed && (
+            <motion.div
+              key="crew-banner"
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="flex-1 min-w-0 flex justify-end"
+            >
+              <span className="inline-flex items-center gap-2 max-w-full h-10 px-3.5 rounded-lg bg-white/15 text-white text-[13px] font-semibold backdrop-blur-sm">
+                <span className="flex -space-x-2 shrink-0">
+                  {acceptedCrew.slice(0, 3).map((u) => (
+                    <Avatar
+                      key={u.id}
+                      initials={u.initials}
+                      color={u.avatarColor}
+                      image={u.avatarImage}
+                      size={20}
+                      ring
+                    />
+                  ))}
+                </span>
+                <span className="truncate">{crewMessage}</span>
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="flex-1 overflow-y-auto no-scrollbar px-5 pt-3 pb-4 flex flex-col justify-center">
@@ -225,7 +271,7 @@ function TicketStep({
             // dark-green → white transition. Without it the article snaps
             // green instantly while the outer is still mid-transition,
             // producing a brief low-contrast flash.
-            "rounded-3xl overflow-hidden transition-colors duration-450",
+            "rounded-lg overflow-hidden transition-colors duration-450",
             isRedeemed ? "bg-brand" : "bg-white",
           )}
         >
@@ -238,6 +284,12 @@ function TicketStep({
           </div>
 
           <div className="px-5 pt-4 pb-5">
+            {gifter && (
+              <span className="inline-flex items-center gap-1.5 py-1 px-2 rounded-md bg-error text-white text-[10px] font-semibold ">
+                <Gift className="w-3.5 h-3.5" strokeWidth={2.5} />
+                {copy.bookingCard.gifted(gifter.name)}
+              </span>
+            )}
             <h2 className="text-[22px] font-bold text-ink leading-tight">
               {restaurant.name}
             </h2>
@@ -256,10 +308,7 @@ function TicketStep({
               time block. They take the colour of the outer background so they
               read as cut-outs of the card edge. `layout="position"` keeps them
               aligned with the (animating) bottom section as the card shrinks. */}
-          <motion.div
-            layout="position"
-            className="relative h-0"
-          >
+          <motion.div layout="position" className="relative h-0">
             <span
               aria-hidden="true"
               className={clsx(
@@ -337,10 +386,7 @@ function TicketStep({
               layout="position"
               className="border-t border-black/10 my-4"
             />
-            <motion.p
-              layout="position"
-              className="text-[14px] text-ink-muted"
-            >
+            <motion.p layout="position" className="text-[14px] text-ink-muted">
               {formatLongDate(liveNow)}
             </motion.p>
           </motion.div>
@@ -372,7 +418,7 @@ function TicketStep({
               <button
                 type="button"
                 onClick={onContinue}
-                className="w-full h-13 rounded-full bg-brand text-ink font-semibold text-[16px] hover:bg-brand-strong active:bg-brand-subtle transition"
+                className="w-full h-13 rounded-lg bg-brand text-ink font-semibold text-[16px] hover:bg-brand-strong active:bg-brand-subtle transition"
               >
                 {c.continue}
               </button>
@@ -410,6 +456,7 @@ function ThankAvatar({ recipient, selected, onToggle }) {
       <Avatar
         initials={recipient.initials}
         color={recipient.avatarColor}
+        image={recipient.avatarImage}
         size={48}
       />
       {selected && (
@@ -514,7 +561,7 @@ function RateSheetContent({
                 <p className="text-[13px] text-ink-muted mb-3">
                   {c.photosHint}
                 </p>
-                <div className="h-24 border-2 border-dashed border-ink/15 rounded-xl flex items-center justify-center bg-surface/40">
+                <div className="h-24 border-2 border-dashed border-ink/15 rounded-lg flex items-center justify-center bg-surface/40">
                   <Plus className="w-6 h-6 text-ink-muted" strokeWidth={2} />
                 </div>
               </div>
@@ -529,7 +576,7 @@ function RateSheetContent({
           onClick={onContinue}
           disabled={!hasRated}
           className={clsx(
-            "w-full h-13 rounded-full font-semibold text-[16px] transition",
+            "w-full h-13 rounded-lg font-semibold text-[16px] transition",
             hasRated
               ? "bg-brand text-ink hover:bg-brand-strong active:bg-brand-subtle"
               : "bg-surface text-ink-muted cursor-not-allowed",
@@ -545,19 +592,21 @@ function RateSheetContent({
 // ─── Sheet step: Recommend to friends ───────────────────────────────────────
 
 function RecommendSheetContent({
-  friends,
+  selectedFriends,
+  hasAnyFriends,
+  onEditGroup,
   message,
   onChangeMessage,
   onSend,
   onSkip,
 }) {
   const c = copy.redeem;
-  const hasFriends = friends.length > 0;
-  const friendSubtitle = hasFriends
-    ? friends.length === 1
+  const hasSelection = selectedFriends.length > 0;
+  const friendSubtitle = hasSelection
+    ? selectedFriends.length === 1
       ? c.friendCountOne
-      : c.friendCount(friends.length)
-    : null;
+      : c.friendCount(selectedFriends.length)
+    : c.recommendNoneSelected;
 
   return (
     <div className="h-full flex flex-col">
@@ -567,13 +616,32 @@ function RecommendSheetContent({
         </h1>
         <p className="text-[14px] text-ink-muted mt-2">{c.recommendSubtitle}</p>
 
-        {hasFriends && (
+        {hasAnyFriends && (
           <div className="mt-5">
-            <FriendGroupCard friends={friends} subtitle={friendSubtitle} />
+            {hasSelection ? (
+              <FriendGroupCard
+                friends={selectedFriends}
+                subtitle={friendSubtitle}
+                onClick={onEditGroup}
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={onEditGroup}
+                className="w-full flex items-center gap-3 p-3 rounded-lg bg-surface hover:bg-surface-strong transition-colors text-left"
+              >
+                <span className="w-9 h-9 rounded-lg bg-white flex items-center justify-center border border-dashed border-ink/30 shrink-0 text-ink-muted">
+                  +
+                </span>
+                <span className="flex-1 min-w-0 text-[15px] font-semibold text-ink-muted">
+                  {c.recommendPickFriends}
+                </span>
+              </button>
+            )}
           </div>
         )}
 
-        {hasFriends && (
+        {hasSelection && (
           <div className="mt-5 border-t border-ink/10 pt-5">
             <p className="text-[14px] font-semibold text-ink mb-2">
               {c.recommendMessageLabel}
@@ -590,11 +658,11 @@ function RecommendSheetContent({
       </div>
 
       <div className="px-5 pt-3 pb-4 shrink-0">
-        {hasFriends ? (
+        {hasSelection ? (
           <button
             type="button"
             onClick={onSend}
-            className="w-full h-13 rounded-full bg-brand text-ink font-semibold text-[16px] hover:bg-brand-strong active:bg-brand-subtle transition"
+            className="w-full h-13 rounded-lg bg-brand text-ink font-semibold text-[16px] hover:bg-brand-strong active:bg-brand-subtle transition"
           >
             {c.recommendSend}
           </button>
@@ -602,11 +670,86 @@ function RecommendSheetContent({
           <button
             type="button"
             onClick={onSkip}
-            className="w-full h-13 rounded-full bg-surface text-ink font-semibold text-[16px] hover:bg-surface-strong transition"
+            className="w-full h-13 rounded-lg bg-surface text-ink font-semibold text-[16px] hover:bg-surface-strong transition"
           >
             {c.recommendDone}
           </button>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Sheet sub-step: pick which friends are in the recommend group ──────────
+
+function RecommendPickerContent({ friends, selectedIds, onToggle, onDone }) {
+  const c = copy.redeem;
+  const selectedSet = new Set(selectedIds);
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="px-5 pt-1 pb-2 shrink-0 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={onDone}
+          aria-label={copy.picker.back}
+          className="w-9 h-9 rounded-lg bg-surface flex items-center justify-center hover:bg-surface-strong shrink-0"
+        >
+          <ChevronLeft className="w-5 h-5 text-ink" strokeWidth={2.5} />
+        </button>
+        <h1 className="flex-1 text-[20px] font-bold text-ink leading-tight pt-1">
+          {c.recommendPickTitle}
+        </h1>
+      </div>
+
+      <div className="flex-1 overflow-y-auto no-scrollbar px-5 pt-1 pb-4">
+        <ul className="space-y-2">
+          {friends.map((f) => {
+            const isSelected = selectedSet.has(f.id);
+            return (
+              <li key={f.id}>
+                <button
+                  type="button"
+                  onClick={() => onToggle(f.id)}
+                  aria-pressed={isSelected}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg bg-surface hover:bg-surface-strong transition-colors text-left"
+                >
+                  <Avatar
+                    initials={f.initials}
+                    color={f.avatarColor}
+                    image={f.avatarImage}
+                    size={40}
+                  />
+                  <span className="flex-1 min-w-0 text-[15px] font-semibold text-ink truncate">
+                    {f.fullName}
+                  </span>
+                  <span
+                    className={clsx(
+                      "w-6 h-6 rounded-lg flex items-center justify-center transition shrink-0",
+                      isSelected
+                        ? "bg-brand"
+                        : "border-2 border-ink/20 bg-white",
+                    )}
+                  >
+                    {isSelected && (
+                      <Check className="w-3.5 h-3.5 text-ink" strokeWidth={3} />
+                    )}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      <div className="px-5 pt-3 pb-4 shrink-0">
+        <button
+          type="button"
+          onClick={onDone}
+          className="w-full h-13 rounded-lg bg-brand text-ink font-semibold text-[16px] hover:bg-brand-strong active:bg-brand-subtle transition"
+        >
+          {c.recommendPickDone(selectedIds.length)}
+        </button>
       </div>
     </div>
   );
@@ -618,6 +761,12 @@ export function RedeemFlow({
   booking,
   deal,
   restaurant,
+  // Viewer = the user actually running this flow. For a gifted booking
+  // the booking's own `userId` is still the gifter, so we can't use that
+  // for attribution on outgoing thank / recommend shares — those would
+  // get logged as "the gifter said thanks", which is wrong on the
+  // recipient's phone.
+  viewer,
   gifter,
   giftMessage,
   recommenders = [],
@@ -626,6 +775,7 @@ export function RedeemFlow({
   onShare,
   onClose,
   onComplete,
+  onStatusBarTone,
 }) {
   // sheetOpen drives the slide-up/slide-down. sheetStep is independent so it
   // doesn't change while the sheet is closing — otherwise the inner
@@ -634,10 +784,23 @@ export function RedeemFlow({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetStep, setSheetStep] = useState("rate");
   const [redeemedAt, setRedeemedAt] = useState(null);
+
+  // The pre-redeem screen runs on a dark green background, so the global
+  // PhoneFrame StatusBar needs to flip to white text. Reports up whenever
+  // the dark surface is on-screen and back to light once redeemed / the
+  // flow unmounts. Skips redundant flips because App dedupes anyway.
+  useEffect(() => {
+    if (!onStatusBarTone) return;
+    onStatusBarTone(redeemedAt ? "light" : "dark");
+    return () => onStatusBarTone("light");
+  }, [redeemedAt, onStatusBarTone]);
   const [savings, setSavings] = useState(2);
   const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState("");
   const [recommendMessage, setRecommendMessage] = useState("");
+  // null = "all friends" (Close-Friends-style default); once the user
+  // explicitly opts someone out we switch to an explicit array.
+  const [explicitSelectedIds, setExplicitSelectedIds] = useState(null);
 
   // Gifter + recommenders, deduped. These are the people who can be thanked
   // inline on the rate sheet.
@@ -670,6 +833,21 @@ export function RedeemFlow({
     setExplicitThanked(next);
   }
 
+  const selectedFriendIds = useMemo(() => {
+    return explicitSelectedIds ?? friends.map((f) => f.id);
+  }, [explicitSelectedIds, friends]);
+  const selectedFriends = useMemo(() => {
+    const set = new Set(selectedFriendIds);
+    return friends.filter((f) => set.has(f.id));
+  }, [friends, selectedFriendIds]);
+
+  function toggleFriendSelection(id) {
+    const next = new Set(selectedFriendIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setExplicitSelectedIds([...next]);
+  }
+
   function handleSlideRedeem() {
     setRedeemedAt(new Date());
     onRedeem?.(booking.id);
@@ -693,7 +871,7 @@ export function RedeemFlow({
           deal,
           type: "thank",
           friends: thankedRecipients,
-          fromUserId: booking.userId,
+          fromUserId: viewer?.id ?? booking.userId,
           message: null,
         });
       }
@@ -715,16 +893,16 @@ export function RedeemFlow({
   }
 
   function handleSendRecommendation() {
-    // One-tap "send to my whole friend group" — matches the Close-Friends
-    // pattern the collapsed card represents. Per-friend opt-out lives
-    // elsewhere (a future "manage close friends" flow), not here.
-    if (friends.length > 0 && onShare) {
+    // Sends to whoever is currently in the (editable) group. The
+    // FriendGroupCard's click handler opens a sub-step where the user can
+    // opt people in/out.
+    if (selectedFriends.length > 0 && onShare) {
       onShare({
         booking,
         deal,
         type: "recommend",
-        friends,
-        fromUserId: booking.userId,
+        friends: selectedFriends,
+        fromUserId: viewer?.id ?? booking.userId,
         message: recommendMessage.trim() || null,
       });
     }
@@ -736,10 +914,11 @@ export function RedeemFlow({
   }
 
   function handleSheetClose() {
-    // Drag-down / backdrop tap: dismiss only the sheet. The booking is
-    // already marked as redeemed, so the user lands back on the redeemed
-    // ticket screen and can exit via the top-left back button.
-    setSheetOpen(false);
+    // Drag-down / backdrop tap after redemption: end the whole flow. The
+    // booking is already marked as redeemed and the active sub-tab is
+    // already flipped to History, so the user lands there immediately
+    // instead of being stranded on the ticket screen.
+    finishFlow();
   }
 
   return (
@@ -749,6 +928,8 @@ export function RedeemFlow({
         restaurant={restaurant}
         redeemedAt={redeemedAt}
         savings={savings}
+        crew={booking?.crew ?? []}
+        gifter={gifter}
         onSlideRedeem={handleSlideRedeem}
         onChangeSavings={setSavings}
         onContinue={handleContinueFromSaved}
@@ -793,11 +974,30 @@ export function RedeemFlow({
               className="flex-1 min-h-0 flex flex-col"
             >
               <RecommendSheetContent
-                friends={friends}
+                selectedFriends={selectedFriends}
+                hasAnyFriends={friends.length > 0}
+                onEditGroup={() => setSheetStep("recommend-pick")}
                 message={recommendMessage}
                 onChangeMessage={setRecommendMessage}
                 onSend={handleSendRecommendation}
                 onSkip={handleSkipRecommend}
+              />
+            </motion.div>
+          )}
+          {sheetStep === "recommend-pick" && (
+            <motion.div
+              key="recommend-pick"
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -24 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+              className="flex-1 min-h-0 flex flex-col"
+            >
+              <RecommendPickerContent
+                friends={friends}
+                selectedIds={selectedFriendIds}
+                onToggle={toggleFriendSelection}
+                onDone={() => setSheetStep("recommend")}
               />
             </motion.div>
           )}

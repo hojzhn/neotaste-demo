@@ -30,11 +30,20 @@ export function BookingCard({
 }) {
   const hasCrew = crew.length > 0;
   const c = copy.bookingCard;
+  // Pending crew get rendered first in DOM so the accepted avatars
+  // paint on top of them in the overlapping stack — the dim "pending"
+  // dot sits behind, not in front. Visual identity of each avatar
+  // doesn't matter here (they're all just heads), so stable ordering
+  // isn't required.
+  const orderedCrew = [
+    ...crew.filter((u) => u.pending),
+    ...crew.filter((u) => !u.pending),
+  ];
 
   return (
-    <article className="bg-white rounded-xl border border-black/5 shadow-[0_4px_24px_-12px_rgba(0,0,0,0.15)]">
+    <article className="bg-white rounded-lg border border-black/5 shadow-[0_4px_24px_-12px_rgba(0,0,0,0.15)]">
       <div className="p-2">
-        <div className="relative h-40 rounded-xl overflow-hidden">
+        <div className="relative h-40 rounded-lg overflow-hidden">
           <img
             src={restaurant.image}
             alt=""
@@ -43,7 +52,7 @@ export function BookingCard({
 
           {gifter && (
             <div className="absolute top-2 left-2">
-              <span className="inline-flex items-center gap-1.5 py-1 px-2 rounded-xl bg-error text-white text-[10px] font-semibold">
+              <span className="inline-flex items-center gap-1.5 py-1 px-2 rounded-lg bg-error text-white text-[10px] font-semibold">
                 <Gift className="w-3.5 h-3.5" strokeWidth={2.5} />
                 {c.gifted(gifter.name)}
               </span>
@@ -57,11 +66,12 @@ export function BookingCard({
                   {c.goingWith}
                 </span>
                 <div className="flex -space-x-2">
-                  {crew.slice(0, 3).map((u) => (
+                  {orderedCrew.slice(0, 3).map((u) => (
                     <Avatar
                       key={u.id}
                       initials={u.initials}
                       color={u.avatarColor}
+                      image={u.avatarImage}
                       size={28}
                       ring
                       pending={u.pending}
@@ -76,7 +86,7 @@ export function BookingCard({
                 onClick={onAddCrew}
                 aria-label={c.addCrew}
                 className={clsx(
-                  "w-8 h-8 rounded-full top-0.5 relative text-ink flex items-center justify-center active:scale-95 transition",
+                  "w-8 h-8 rounded-lg top-0.5 relative text-ink flex items-center justify-center active:scale-95 transition",
                   hasPendingInvites
                     ? "bg-brand-strong hover:bg-brand"
                     : "bg-brand hover:bg-brand-strong",

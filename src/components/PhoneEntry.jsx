@@ -71,7 +71,7 @@ export function PhoneEntry({
         {remaining !== null && (
           <div
             className={clsx(
-              'inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-[12px] font-semibold mb-4',
+              'inline-flex items-center gap-1.5 h-7 px-3 rounded-lg text-[12px] font-semibold mb-4',
               hasQuota ? 'bg-surface text-ink' : 'bg-error/10 text-error',
             )}
           >
@@ -119,7 +119,7 @@ export function PhoneEntry({
           }}
           disabled={!canContinue}
           className={clsx(
-            'w-full h-13 rounded-full font-semibold text-[16px] transition',
+            'w-full h-13 rounded-lg font-semibold text-[16px] transition',
             canContinue
               ? 'bg-brand text-ink hover:bg-brand-strong active:bg-brand-subtle'
               : 'bg-surface text-ink-muted cursor-not-allowed',

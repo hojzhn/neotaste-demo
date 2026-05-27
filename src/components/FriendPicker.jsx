@@ -72,7 +72,7 @@ export function FriendPicker({
           type="button"
           onClick={onClose}
           aria-label={copy.picker.close}
-          className="w-9 h-9 rounded-full bg-surface flex items-center justify-center hover:bg-surface-strong shrink-0"
+          className="w-9 h-9 rounded-lg bg-surface flex items-center justify-center hover:bg-surface-strong shrink-0"
         >
           <X className="w-5 h-5 text-ink" strokeWidth={2.5} />
         </button>
@@ -95,9 +95,9 @@ export function FriendPicker({
           <button
             type="button"
             onClick={onPickPhone}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl hover:bg-black/3 active:bg-black/6 transition-colors text-left"
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-black/3 active:bg-black/6 transition-colors text-left"
           >
-            <span className="w-11 h-11 rounded-full bg-ink flex items-center justify-center shrink-0">
+            <span className="w-11 h-11 rounded-lg bg-ink flex items-center justify-center shrink-0">
               <Phone className="w-5 h-5 text-white" strokeWidth={2.25} />
             </span>
             <div className="flex-1 min-w-0">
@@ -129,7 +129,7 @@ export function FriendPicker({
                 onClick={() => !disabledRow && handleRowTap(friend)}
                 disabled={disabledRow}
                 className={clsx(
-                  'w-full flex items-center gap-3 px-3 py-3 rounded-2xl transition-colors text-left',
+                  'w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-colors text-left',
                   !disabledRow && 'hover:bg-black/3 active:bg-black/6',
                   disabledRow && 'opacity-40 cursor-not-allowed',
                   isSelected && !isExcluded && 'bg-brand-subtle/40',
@@ -138,6 +138,7 @@ export function FriendPicker({
                 <Avatar
                   initials={friend.initials}
                   color={friend.avatarColor}
+                  image={friend.avatarImage}
                   size={44}
                 />
                 <div className="flex-1 min-w-0">
@@ -151,7 +152,7 @@ export function FriendPicker({
                 {mode === 'multi' ? (
                   <span
                     className={clsx(
-                      'w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-colors',
+                      'w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-colors',
                       showChecked
                         ? 'bg-brand text-ink'
                         : 'border-2 border-black/20',
@@ -176,7 +177,7 @@ export function FriendPicker({
             onClick={handleContinue}
             disabled={selected.size === 0}
             className={clsx(
-              'w-full h-13 rounded-full font-semibold text-[16px] transition',
+              'w-full h-13 rounded-lg font-semibold text-[16px] transition',
               selected.size > 0
                 ? 'bg-brand text-ink hover:bg-brand-strong active:bg-brand-subtle'
                 : 'bg-surface text-ink-muted cursor-not-allowed',

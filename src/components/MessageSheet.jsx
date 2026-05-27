@@ -102,7 +102,7 @@ export function MessageSheet({
                 aria-label={copy.message.change}
                 className="w-full text-left flex items-center gap-3 p-3 rounded-lg bg-surface hover:bg-surface-strong transition-colors"
               >
-                <span className="w-9 h-9 rounded-full bg-ink flex items-center justify-center shrink-0">
+                <span className="w-9 h-9 rounded-lg bg-ink flex items-center justify-center shrink-0">
                   <Phone className="w-4 h-4 text-white" strokeWidth={2.25} />
                 </span>
                 <div className="flex-1 min-w-0">
@@ -124,6 +124,7 @@ export function MessageSheet({
                 <Avatar
                   initials={friends[0].initials}
                   color={friends[0].avatarColor}
+                  image={friends[0].avatarImage}
                   size={36}
                 />
                 <div className="flex-1 min-w-0">
@@ -169,7 +170,7 @@ export function MessageSheet({
           <div className="flex justify-center mb-2">
             <span
               className={clsx(
-                "inline-flex items-center gap-1.5 h-7 px-3 rounded-full text-[12px] font-semibold",
+                "inline-flex items-center gap-1.5 h-7 px-3 rounded-lg text-[12px] font-semibold",
                 hasQuota ? "bg-surface text-ink" : "bg-error/10 text-error",
               )}
             >
@@ -187,7 +188,7 @@ export function MessageSheet({
           onClick={() => canSend && onSend(message.trim())}
           disabled={!canSend}
           className={clsx(
-            "w-full h-13 rounded-full font-semibold text-[16px] inline-flex items-center justify-center gap-2 transition",
+            "w-full h-13 rounded-lg font-semibold text-[16px] inline-flex items-center justify-center gap-2 transition",
             canSend
               ? "bg-brand text-ink hover:bg-brand-strong active:bg-brand-subtle"
               : "bg-surface text-ink-muted cursor-not-allowed",

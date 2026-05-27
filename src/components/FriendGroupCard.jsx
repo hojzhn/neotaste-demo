@@ -1,4 +1,5 @@
 import clsx from "clsx";
+import { ChevronRight } from "lucide-react";
 import { Avatar } from "./Avatar";
 
 // Collapsed display of a friend group, à la Instagram's Close Friends share
@@ -24,7 +25,7 @@ export function FriendGroupCard({
       type={onClick ? "button" : undefined}
       onClick={onClick}
       className={clsx(
-        "w-full flex items-center gap-3 p-3 rounded-2xl bg-surface text-left",
+        "w-full flex items-center gap-3 p-3 rounded-lg bg-surface text-left",
         onClick && "hover:bg-surface-strong transition-colors",
         className,
       )}
@@ -35,6 +36,7 @@ export function FriendGroupCard({
             key={f.id}
             initials={f.initials}
             color={f.avatarColor}
+            image={f.avatarImage}
             size={36}
             ring
           />
@@ -46,6 +48,13 @@ export function FriendGroupCard({
           <p className="text-[12px] text-ink-muted truncate">{subtitle}</p>
         )}
       </div>
+      {onClick && (
+        <ChevronRight
+          className="w-5 h-5 text-ink-muted shrink-0"
+          strokeWidth={2.25}
+          aria-hidden="true"
+        />
+      )}
     </Element>
   );
 }

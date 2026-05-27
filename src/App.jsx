@@ -8,7 +8,14 @@ import { restaurantsById } from "./data/restaurants";
 import { copy } from "./copy";
 import { MAX_CREW, OUTSIDER_GIFT_LIMIT } from "./lib/constants";
 
-const [maria, tom] = users;
+// Two demo phone users. IDs are still 'maria' / 'tom' under the hood — the
+// seed shares and bookings reference those — but the display names are
+// Arabel and Hicks.
+const [arabel, hicks] = users;
+const DEFAULT_BOOKMARKS_BY_USER_ID = {
+  [arabel.id]: ["list-lena-date", "list-lena-brunch"],
+  [hicks.id]: ["list-sofia-toms"],
+};
 
 function App() {
   const [shares, setShares] = useState([]);
@@ -17,14 +24,49 @@ function App() {
   // means we never mutate the seed data.
   const [extraBookings, setExtraBookings] = useState([]);
   // Per-booking redemption data captured from the Redeem flow:
-  //   { [bookingId]: { redeemedAt, savings?, rating? } }
+  //   { [bookingId]: { redeemedAt, savings? } }
   // Slide-to-redeem creates the entry (with redeemedAt only). When the
-  // user finishes the rate / credit sheet, savings + rating are merged in.
+  // user finishes the rate sheet, savings is merged in.
   const [redemptions, setRedemptions] = useState({});
+  // Per-user reviews — each diner on a booking can write their own rating
+  // and review independently of whoever redeemed the deal:
+  //   { [bookingId]: { [userId]: { rating, review, savedAt } } }
+  const [userReviews, setUserReviews] = useState({});
+  // Per-user bookmarks: which user-curated lists each phone user has saved.
+  //   { [userId]: ["list-id-1", "list-id-2", ...] }
+  // Lives in App so the saved state persists across opens of UserDetailPage
+  // and ListDetailPage, and so the same user sees the same bookmark count
+  // / filled icon from both surfaces.
+  const [bookmarksByUserId, setBookmarksByUserId] = useState(
+    DEFAULT_BOOKMARKS_BY_USER_ID,
+  );
+  // Per-phone StatusBar tone. Most screens are light-on-white; the redeem
+  // flow's pre-redeem state runs on a dark background and reports up so the
+  // single global StatusBar in PhoneFrame can flip to white text. Keyed by
+  // user id so each phone is independent.
+  const [statusBarToneByUserId, setStatusBarToneByUserId] = useState({});
+  function handleSetStatusBarTone(userId, tone) {
+    if (!userId) return;
+    setStatusBarToneByUserId((prev) =>
+      prev[userId] === tone ? prev : { ...prev, [userId]: tone },
+    );
+  }
+
+  function handleToggleListBookmark(userId, listId) {
+    if (!userId || !listId) return;
+    setBookmarksByUserId((prev) => {
+      const current = prev[userId] ?? [];
+      const next = current.includes(listId)
+        ? current.filter((id) => id !== listId)
+        : [...current, listId];
+      return { ...prev, [userId]: next };
+    });
+  }
   const allBookings = [...seedBookings, ...extraBookings];
 
-  function handleRedeemBooking(bookingId, data = {}) {
+  function handleRedeemBooking(bookingId, viewerId, data = {}) {
     if (!bookingId) return;
+    const isFirstTime = !redemptions[bookingId];
     setRedemptions((prev) => {
       const existing = prev[bookingId];
       return {
@@ -36,6 +78,79 @@ function App() {
         },
       };
     });
+    // On the very first redemption, fan out a "redeemed" share to each
+    // accepted crew member so their phones get a toast + notification
+    // ("Hicks redeemed your deal — leave a review"). The redeemer (the
+    // viewer who actually ran the flow) is the share's `from` —
+    // booking.userId would point at the gifter for gift transfers, not
+    // at the person who just stood in the restaurant.
+    if (isFirstTime) {
+      const booking = allBookings.find((b) => b.id === bookingId);
+      if (booking) {
+        const redeemerId = viewerId ?? booking.userId;
+        const crewIds = new Set();
+        for (const s of shares) {
+          if (
+            s.bookingId === bookingId &&
+            s.type === "dine" &&
+            s.status === "accepted" &&
+            s.toUserId !== redeemerId
+          ) {
+            crewIds.add(s.toUserId);
+          }
+        }
+        const ts = Date.now();
+        const fanOut = Array.from(crewIds).map((toUserId, i) => ({
+          id: `redeemed-${bookingId}-${toUserId}-${ts}-${i}`,
+          fromUserId: redeemerId,
+          toUserId,
+          toPhone: null,
+          bookingId,
+          dealId: booking.dealId,
+          type: "redeemed",
+          message: null,
+          status: "accepted",
+          createdAt: ts,
+          lastUpdatedAt: ts,
+        }));
+        // Two side effects on first redemption:
+        //   - fan out "redeemed" shares to anyone who accepted, and
+        //   - drop pending dine invites for this booking — by the time the
+        //     host has redeemed, the meal is moot and the invitee
+        //     shouldn't still see an Accept/Decline notification.
+        setShares((prev) => {
+          if (
+            prev.some((s) => s.bookingId === bookingId && s.type === "redeemed")
+          ) {
+            return prev;
+          }
+          const cleaned = prev.filter(
+            (s) =>
+              !(
+                s.bookingId === bookingId &&
+                s.type === "dine" &&
+                s.status === "pending"
+              ),
+          );
+          return fanOut.length > 0 ? [...cleaned, ...fanOut] : cleaned;
+        });
+      }
+    }
+  }
+
+  function handleSaveReview(bookingId, userId, data = {}) {
+    if (!bookingId || !userId) return;
+    setUserReviews((prev) => ({
+      ...prev,
+      [bookingId]: {
+        ...(prev[bookingId] ?? {}),
+        [userId]: {
+          ...(prev[bookingId]?.[userId] ?? {}),
+          ...data,
+          savedAt: Date.now(),
+        },
+      },
+    }));
   }
 
   function handleCreateBooking({ userId, deal }) {
@@ -222,20 +337,43 @@ function App() {
         const redemption = redemptions[seed.id];
         const seedIsHistory = seed.status === "history";
         const isHistory = !!redemption || seedIsHistory;
-        // Merge live redemption data over seed values so a seed history
-        // entry (cancelled / pre-rated) keeps its own fields while a
-        // freshly-redeemed booking gets ours.
-        const rating = redemption?.rating ?? seed.rating;
+
+        // Recommendations the viewer sent for this booking — used to
+        // highlight the ThumbsUp on the history card and surface the
+        // recipients + message in a tap-through sheet.
+        const sentRecommendations = shares
+          .filter(
+            (s) =>
+              s.bookingId === seed.id &&
+              s.type === "recommend" &&
+              s.fromUserId === userId,
+          )
+          .map((s) => ({
+            ...s,
+            toUser: s.toUserId ? usersById[s.toUserId] : null,
+          }))
+          .filter((s) => s.toUser);
+        // Per-user review for this booking. Each diner writes their own,
+        // so the rating shown on the history card reflects the *viewer's*
+        // take, not the host's. Falls back to the seed value only when the
+        // viewer is the seed booking's owner (covers the pre-seeded history
+        // entries that have a rating baked in).
+        const myReview = userReviews[seed.id]?.[userId];
+        const rating =
+          myReview?.rating ??
+          (seed.userId === userId ? seed.rating : undefined);
+        const review = myReview?.review;
         const savings = redemption?.savings ?? seed.savings;
         const redeemedAt = redemption?.redeemedAt ?? seed.redeemedAt;
-        const outcome =
-          seed.outcome ?? (redemption ? "redeemed" : undefined);
+        const outcome = seed.outcome ?? (redemption ? "redeemed" : undefined);
 
         return {
           ...seed,
           status: isHistory ? "history" : (seed.status ?? "upcoming"),
           outcome,
           rating,
+          review,
+          hasReview: rating != null,
           savings,
           redeemedAt,
           redeemed: isHistory,
@@ -245,6 +383,7 @@ function App() {
           hasPendingInvites,
           dineRecipientIds,
           remainingSlots,
+          sentRecommendations,
           lastActivity: redeemedAt ?? lastActivity,
         };
       })
@@ -278,8 +417,8 @@ function App() {
       .filter(Boolean);
   }
 
-  const mariaFriends = maria.friendIds.map((id) => usersById[id]);
-  const tomFriends = tom.friendIds.map((id) => usersById[id]);
+  const arabelFriends = arabel.friendIds.map((id) => usersById[id]);
+  const hicksFriends = hicks.friendIds.map((id) => usersById[id]);
 
   return (
     <main className="min-h-screen w-full flex flex-col items-center justify-start py-12 px-6 gap-10">
@@ -288,41 +427,65 @@ function App() {
         <p className="text-ink-muted">{copy.app.subtitle}</p> */}
       </header>
       <div className="flex flex-wrap items-start justify-center gap-12">
-        <PhoneFrame label={maria.fullName} sublabel="Sender">
+        <PhoneFrame
+          user={arabel}
+          role="User A"
+          statusBarDark={statusBarToneByUserId[arabel.id] === "dark"}
+        >
           <BookingsScreen
-            user={maria}
-            bookings={bookingsForUser(maria.id)}
-            pendingInvitations={pendingInvitationsForUser(maria.id)}
-            friends={mariaFriends}
+            user={arabel}
+            bookings={bookingsForUser(arabel.id)}
+            pendingInvitations={pendingInvitationsForUser(arabel.id)}
+            friends={arabelFriends}
             shares={shares}
-            phoneGiftsUsed={phoneGiftsUsedBy(maria.id)}
+            phoneGiftsUsed={phoneGiftsUsedBy(arabel.id)}
             phoneGiftLimit={OUTSIDER_GIFT_LIMIT}
             onShare={handleShare}
             onAcceptShare={handleAcceptShare}
             onDeclineShare={handleDeclineShare}
             onCreateBooking={({ deal }) =>
-              handleCreateBooking({ userId: maria.id, deal })
+              handleCreateBooking({ userId: arabel.id, deal })
             }
             onRedeemBooking={handleRedeemBooking}
+            onSaveReview={handleSaveReview}
+            bookmarkedListIds={bookmarksByUserId[arabel.id] ?? []}
+            onToggleListBookmark={(listId) =>
+              handleToggleListBookmark(arabel.id, listId)
+            }
+            onSetStatusBarTone={(tone) =>
+              handleSetStatusBarTone(arabel.id, tone)
+            }
             interactive
           />
         </PhoneFrame>
-        <PhoneFrame label={tom.fullName} sublabel="Receiver">
+        <PhoneFrame
+          user={hicks}
+          role="User B"
+          statusBarDark={statusBarToneByUserId[hicks.id] === "dark"}
+        >
           <BookingsScreen
-            user={tom}
-            bookings={bookingsForUser(tom.id)}
-            pendingInvitations={pendingInvitationsForUser(tom.id)}
-            friends={tomFriends}
+            user={hicks}
+            bookings={bookingsForUser(hicks.id)}
+            pendingInvitations={pendingInvitationsForUser(hicks.id)}
+            friends={hicksFriends}
             shares={shares}
-            phoneGiftsUsed={phoneGiftsUsedBy(tom.id)}
+            phoneGiftsUsed={phoneGiftsUsedBy(hicks.id)}
             phoneGiftLimit={OUTSIDER_GIFT_LIMIT}
             onShare={handleShare}
             onAcceptShare={handleAcceptShare}
             onDeclineShare={handleDeclineShare}
             onCreateBooking={({ deal }) =>
-              handleCreateBooking({ userId: tom.id, deal })
+              handleCreateBooking({ userId: hicks.id, deal })
             }
             onRedeemBooking={handleRedeemBooking}
+            onSaveReview={handleSaveReview}
+            bookmarkedListIds={bookmarksByUserId[hicks.id] ?? []}
+            onToggleListBookmark={(listId) =>
+              handleToggleListBookmark(hicks.id, listId)
+            }
+            onSetStatusBarTone={(tone) =>
+              handleSetStatusBarTone(hicks.id, tone)
+            }
             interactive
           />
         </PhoneFrame>

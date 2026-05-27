@@ -89,6 +89,7 @@ export function RedeemButton({ gifter, giftMessage, onRedeem }) {
             <Avatar
               initials={gifter.initials}
               color={gifter.avatarColor}
+              image={gifter.avatarImage}
               size={28}
               ring
             />

@@ -19,6 +19,20 @@ export const copy = {
     saved: (amount) => `${amount}€ saved`,
     cancelled: "Cancelled",
     bookAgain: "Book again",
+    writeReviewTitle: (name) => `Rate your visit to ${name}`,
+    writeReviewSubtitle: "Tap a star to rate.",
+    writeReviewHowLabel: "How was it?",
+    writeReviewPlaceholder: "Share your experience.",
+    writeReviewSubmit: "Post review",
+    writeReviewContinue: "Continue",
+    redeemedToast: (name) => `${name} redeemed your deal`,
+    redeemedNotification: "{name} redeemed your deal",
+    leaveReview: "Leave a review",
+    recommendedTitle: "You recommended this",
+    recommendedSubtitle: (count) =>
+      count === 1 ? "Sent to 1 friend" : `Sent to ${count} friends`,
+    recommendedMessageLabel: "Your message",
+    recommendedNoMessage: "No message attached.",
   },
   dealCard: {
     bookDeal: "Book deal",
@@ -57,6 +71,13 @@ export const copy = {
     recommendPlaceholder: "Why do you recommend it?",
     recommendSend: "Send recommendation",
     recommendDone: "Done",
+    redeemingWithOne: "Redeeming with 1 friend",
+    redeemingWith: (n) => `Redeeming with ${n} friends`,
+    recommendPickTitle: "Recommend to…",
+    recommendPickDone: (n) =>
+      n === 0 ? "Done" : n === 1 ? "Done · 1 friend" : `Done · ${n} friends`,
+    recommendPickFriends: "Pick friends to recommend to",
+    recommendNoneSelected: "No one selected",
     friendCountOne: "1 friend",
     friendCount: (n) => `${n} friends`,
   },
@@ -79,6 +100,26 @@ export const copy = {
         : `${count} friends recommend this`,
     empty: "No recommendations yet.",
   },
+  userDetail: {
+    followers: "Followers",
+    following: "Following",
+    follow: "Follow",
+    followingBtn: "Following",
+    reviews: "Reviews",
+    lists: "Lists",
+    emptyReviews: "No reviews yet.",
+    emptyLists: "No lists yet.",
+    listCountOne: "1 spot",
+    listCount: (n) => `${n} spots`,
+    saveList: "Save list",
+    listBy: (name) => `${name}`,
+    listSavedBy: (count) => `bookmarked by ${count}`,
+    friendsBadge: "Friends",
+    friendsOnly: "Friends only",
+    visited: "Visited",
+    yourListsHeader: "Your lists",
+    savedListsHeader: "Bookmarked",
+  },
   detailPage: {
     open: "Open",
     closesAt: (time) => `Closes at ${time}`,
@@ -97,6 +138,16 @@ export const copy = {
       if (daysAgo < 30) return `${Math.floor(daysAgo / 7)} weeks ago`;
       if (daysAgo < 60) return "1 month ago";
       return `${Math.floor(daysAgo / 30)} months ago`;
+    },
+    timeAgoShort: (daysAgo) => {
+      if (daysAgo < 1) return "today";
+      if (daysAgo === 1) return "1d ago";
+      if (daysAgo < 7) return `${daysAgo}d ago`;
+      if (daysAgo < 14) return "1w ago";
+      if (daysAgo < 30) return `${Math.floor(daysAgo / 7)}w ago`;
+      if (daysAgo < 60) return "1mo ago";
+      if (daysAgo < 365) return `${Math.floor(daysAgo / 30)}mo ago`;
+      return `${Math.floor(daysAgo / 365)}y ago`;
     },
     actions: {
       menu: "Menu",
@@ -168,6 +219,7 @@ export const copy = {
     dineSent: (who) => `Invited ${who}`,
     thankSent: (who) => `Thanked ${who}`,
     recommendSent: (who) => `Recommendation sent to ${who}`,
+    redeemedReceived: (name) => `${name} redeemed your deal`,
     peopleCount: (count) => `${count} people`,
     dismiss: "Dismiss",
   },
@@ -185,6 +237,7 @@ export const copy = {
     bookDeal: "Book a deal",
     seeBookings: "See bookings",
     seeInformation: "See information",
+    writeReview: "Write review",
     giftReceived: (name) => `${name} sent you a gift`,
     giftSent: (name) => `You sent ${name} a gift`,
     giftSentToPhone: (phone) => `You sent a gift to ${phone}`,
@@ -204,6 +257,7 @@ export const copy = {
       dineAccepted: "{name} accepted your invitation",
       thankReceived: "{name} thanked you for the recommendation",
       recommendReceived: "{name} recommends a deal",
+      redeemedReceived: "{name} redeemed your deal",
     },
   },
 };

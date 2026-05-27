@@ -10,7 +10,7 @@ export function PendingInvitationCard({
 }) {
   const c = copy.invitations
   return (
-    <article className="bg-white rounded-xl border border-black/5 p-3 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.08)]">
+    <article className="bg-white rounded-lg border border-black/5 p-3 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.08)]">
       <div className="flex items-start gap-3">
         <img
           src={restaurant.image}

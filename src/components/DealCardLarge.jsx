@@ -9,7 +9,7 @@ function Chip({ icon: Icon, children, isFlash }) {
   return (
     <span
       className={clsx(
-        "inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-[12px] font-semibold",
+        "inline-flex items-center gap-1.5 h-7 px-3 rounded-lg border text-[12px] font-semibold",
         isFlash ? "border-brand/30 text-brand" : "border-ink/20 text-ink",
       )}
     >
@@ -69,7 +69,7 @@ export function DealCardLarge({
   onShowRecommenders,
 }) {
   const isFlash = deal.flash;
-  const visible = recommenders.slice(0, 3);
+  const visible = recommenders.slice(0, 2);
   const extra = Math.max(0, recommenders.length - visible.length);
 
   const [recIndex, setRecIndex] = useState(0);
@@ -131,7 +131,7 @@ export function DealCardLarge({
   return (
     <article
       className={clsx(
-        "relative rounded-xl p-4",
+        "relative rounded-lg p-4",
         isFlash ? "bg-brand-darkest" : "bg-brand",
       )}
     >
@@ -240,6 +240,7 @@ export function DealCardLarge({
                       key={u.id}
                       initials={u.initials}
                       color={u.avatarColor}
+                      image={u.avatarImage}
                       size={24}
                       ring
                     />

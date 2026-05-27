@@ -7,6 +7,7 @@ const fixed = (y, m, d, h = 13, min = 24) =>
   new Date(y, m - 1, d, h, min).getTime()
 
 export const bookings = [
+  // ── Upcoming ──────────────────────────────────────────────────────
   {
     id: 'b-maria-1',
     userId: 'maria',
@@ -34,7 +35,9 @@ export const bookings = [
     status: 'upcoming',
     createdAt: NOW - 2 * DAY,
   },
-  // ── seeded history ────────────────────────────────────────────────
+
+  // ── Arabel's history ─────────────────────────────────────────────
+  // March 2026
   {
     id: 'b-maria-h1',
     userId: 'maria',
@@ -60,6 +63,76 @@ export const bookings = [
     createdAt: fixed(2026, 3, 8, 19, 0),
   },
   {
+    id: 'b-maria-h3',
+    userId: 'maria',
+    dealId: 'coffee-loyalty',
+    dateLabel: '22.03.2026',
+    timeWindow: '10:15',
+    status: 'history',
+    outcome: 'redeemed',
+    rating: 5,
+    savings: 4,
+    redeemedAt: fixed(2026, 3, 22, 10, 15),
+    createdAt: fixed(2026, 3, 22, 10, 15),
+  },
+  // April 2026
+  {
+    id: 'b-maria-h4',
+    userId: 'maria',
+    dealId: 'flash-cookie',
+    dateLabel: '15.04.2026',
+    timeWindow: '15:30',
+    status: 'history',
+    outcome: 'redeemed',
+    rating: 5,
+    savings: 3,
+    redeemedAt: fixed(2026, 4, 15, 15, 30),
+    createdAt: fixed(2026, 4, 15, 15, 30),
+  },
+  {
+    id: 'b-maria-h5',
+    userId: 'maria',
+    dealId: 'free-burger',
+    dateLabel: '22.04.2026',
+    timeWindow: '19:00',
+    status: 'history',
+    outcome: 'redeemed',
+    rating: 4,
+    savings: 7,
+    redeemedAt: fixed(2026, 4, 22, 19, 0),
+    createdAt: fixed(2026, 4, 22, 19, 0),
+  },
+  // May 2026
+  {
+    id: 'b-maria-h6',
+    userId: 'maria',
+    dealId: 'coffee-dessert-bundle',
+    dateLabel: '05.05.2026',
+    timeWindow: '16:00',
+    status: 'history',
+    outcome: 'redeemed',
+    rating: 4,
+    savings: 5,
+    redeemedAt: fixed(2026, 5, 5, 16, 0),
+    createdAt: fixed(2026, 5, 5, 16, 0),
+  },
+  {
+    id: 'b-maria-h7',
+    userId: 'maria',
+    dealId: 'welcome-glass',
+    dateLabel: '18.05.2026',
+    timeWindow: '20:00',
+    status: 'history',
+    outcome: 'redeemed',
+    rating: 5,
+    savings: 6,
+    redeemedAt: fixed(2026, 5, 18, 20, 0),
+    createdAt: fixed(2026, 5, 18, 20, 0),
+  },
+
+  // ── Hicks's history ──────────────────────────────────────────────
+  // February 2026
+  {
     id: 'b-tom-h1',
     userId: 'tom',
     dealId: 'free-burger',
@@ -71,5 +144,71 @@ export const bookings = [
     savings: 12,
     redeemedAt: fixed(2026, 2, 14, 20, 10),
     createdAt: fixed(2026, 2, 14, 20, 10),
+  },
+  // March 2026
+  {
+    id: 'b-tom-h2',
+    userId: 'tom',
+    dealId: '2for1-bowl',
+    dateLabel: '18.03.2026',
+    timeWindow: '13:30',
+    status: 'history',
+    outcome: 'redeemed',
+    rating: 4,
+    savings: 6,
+    redeemedAt: fixed(2026, 3, 18, 13, 30),
+    createdAt: fixed(2026, 3, 18, 13, 30),
+  },
+  {
+    id: 'b-tom-h3',
+    userId: 'tom',
+    dealId: 'extra-patty',
+    dateLabel: '29.03.2026',
+    timeWindow: '20:00',
+    status: 'history',
+    outcome: 'redeemed',
+    rating: 5,
+    savings: 5,
+    redeemedAt: fixed(2026, 3, 29, 20, 0),
+    createdAt: fixed(2026, 3, 29, 20, 0),
+  },
+  // April 2026
+  {
+    id: 'b-tom-h4',
+    userId: 'tom',
+    dealId: 'flash-cookie',
+    dateLabel: '03.04.2026',
+    timeWindow: '14:00',
+    status: 'history',
+    outcome: 'redeemed',
+    rating: 4,
+    savings: 4,
+    redeemedAt: fixed(2026, 4, 3, 14, 0),
+    createdAt: fixed(2026, 4, 3, 14, 0),
+  },
+  {
+    id: 'b-tom-h5',
+    userId: 'tom',
+    dealId: 'coffee-loyalty',
+    dateLabel: '19.04.2026',
+    timeWindow: '09:45',
+    status: 'history',
+    outcome: 'cancelled',
+    redeemedAt: fixed(2026, 4, 19, 9, 45),
+    createdAt: fixed(2026, 4, 19, 9, 45),
+  },
+  // May 2026
+  {
+    id: 'b-tom-h6',
+    userId: 'tom',
+    dealId: 'menu-upgrade',
+    dateLabel: '10.05.2026',
+    timeWindow: '19:00',
+    status: 'history',
+    outcome: 'redeemed',
+    rating: 5,
+    savings: 11,
+    redeemedAt: fixed(2026, 5, 10, 19, 0),
+    createdAt: fixed(2026, 5, 10, 19, 0),
   },
 ]
