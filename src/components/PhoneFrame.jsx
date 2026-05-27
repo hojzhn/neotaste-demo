@@ -135,13 +135,15 @@ export function PhoneFrame({
         )}
       </AnimatePresence>
 
-      {/* Single global StatusBar per phone — floats above every
-          in-app overlay (including the redeem flow at z-50 and the
-          raised TabBar at z-45). Tone is driven by whatever screen
-          is currently dominant, lifted through App. */}
-      <div className="absolute top-0 inset-x-0 z-50 pointer-events-none">
-        <StatusBar dark={statusBarDark} />
-      </div>
+      {/* Fake StatusBar — only renders inside the desktop bezel where
+          there's no real one. On mobile (`naked`) the device's own
+          status bar is already present, so showing a second clock /
+          battery icon reads as broken. */}
+      {!naked && (
+        <div className="absolute top-0 inset-x-0 z-50 pointer-events-none">
+          <StatusBar dark={statusBarDark} />
+        </div>
+      )}
     </div>
   );
 
