@@ -155,11 +155,13 @@ export function RestaurantDetailPage({
 
   return (
     <div className="w-full h-full flex flex-col bg-white relative">
-      {/* Back chevron is rendered globally by PhoneFrame; this row only
-          carries the sticky restaurant name that blur-fades in once the
-          large title has scrolled past. The min-h-13 reserves the same
-          vertical footprint as before so the floating back has somewhere
-          to sit and the scroll body starts in the same place. */}
+      {/* Back chevron is rendered globally by PhoneFrame at top-12.
+          The header row carries the sticky restaurant name that blur-
+          fades in once the large title has scrolled past. The min-h-13
+          reserves just enough room that the page body starts below the
+          panel's top inset — the parent overlay is responsible for
+          starting at top-11 on desktop so the floating back button has
+          its 88px landing zone above the page content. */}
       <div className="shrink-0 relative z-20 bg-white">
         <div className="px-3 py-2 flex items-center relative min-h-13">
           <motion.h2

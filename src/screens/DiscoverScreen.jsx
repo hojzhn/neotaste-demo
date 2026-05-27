@@ -122,12 +122,21 @@ function MapControls({ browseMode, onToggleBrowseMode }) {
 }
 
 // One row in the "Browse all deals" drawer — image, name, rating /
-// category / distance, and the deal pills. Deals stay on a single row
-// and scroll horizontally so long lists don't make the card grow.
-function RestaurantRow({ restaurant, deals }) {
+// category / distance, and the deal pills. Whole row is a button when
+// `onOpen` is wired so tapping anywhere jumps to RestaurantDetailPage.
+function RestaurantRow({ restaurant, deals, onOpen }) {
   const c = copy.detailPage;
+  const Tag = onOpen ? "button" : "article";
   return (
-    <article className="flex items-center gap-3 p-2 rounded-lg">
+    <Tag
+      type={onOpen ? "button" : undefined}
+      onClick={onOpen}
+      className={clsx(
+        "w-full text-left flex items-center gap-3 p-2 rounded-lg",
+        onOpen &&
+          "cursor-pointer hover:bg-surface/40 active:bg-surface/60 transition-colors",
+      )}
+    >
       <img
         src={restaurant.image}
         alt=""
@@ -162,7 +171,7 @@ function RestaurantRow({ restaurant, deals }) {
           </div>
         )}
       </div>
-    </article>
+    </Tag>
   );
 }
 
@@ -249,6 +258,7 @@ function ListDetailView({
   listRestaurants,
   viewerId,
   onOpenUser,
+  onOpenRestaurant,
   onClose,
   onUnbookmark,
 }) {
@@ -327,6 +337,7 @@ function ListDetailView({
             key={restaurant.id}
             restaurant={restaurant}
             deals={dealsByRestaurantId[restaurant.id] ?? []}
+            onOpen={onOpenRestaurant ? () => onOpenRestaurant(restaurant.id) : undefined}
           />
         ))}
       </div>
@@ -346,6 +357,7 @@ function BrowseSheetContent({
   viewerId,
   onSelectList,
   onOpenUser,
+  onOpenRestaurant,
   onCloseList,
   onUnbookmarkList,
   onExitListsMode,
@@ -370,6 +382,7 @@ function BrowseSheetContent({
               listRestaurants={listRestaurants}
               viewerId={viewerId}
               onOpenUser={onOpenUser}
+              onOpenRestaurant={onOpenRestaurant}
               onClose={onCloseList}
               onUnbookmark={onUnbookmarkList}
             />
@@ -406,6 +419,11 @@ function BrowseSheetContent({
                         key={restaurant.id}
                         restaurant={restaurant}
                         deals={deals}
+                        onOpen={
+                          onOpenRestaurant
+                            ? () => onOpenRestaurant(restaurant.id)
+                            : undefined
+                        }
                       />
                     ))}
               </div>
@@ -494,6 +512,7 @@ function SelectedRestaurantCard({
   insightIndex,
   onCycleInsight,
   onSelectInsight,
+  onOpen,
   onClose,
   onOpenUser,
 }) {
@@ -648,42 +667,57 @@ function SelectedRestaurantCard({
         </div>
       )}
 
-      <div className="p-3 flex items-start gap-3">
-        <img
-          src={restaurant.image}
-          alt=""
-          className="w-16 h-16 rounded-lg object-cover shrink-0"
-        />
-        <div className="flex-1 min-w-0 pr-6">
-          <h3 className="text-[16px] font-bold text-ink truncate leading-tight">
-            {restaurant.name}
-          </h3>
-          <p className="text-[12px] text-ink-muted truncate flex items-center gap-1 mt-0.5">
-            <Star
-              className="w-3 h-3 fill-brand-darker text-brand-darker shrink-0"
-              strokeWidth={0}
+      {(() => {
+        const BodyTag = onOpen ? "button" : "div";
+        return (
+          <BodyTag
+            type={onOpen ? "button" : undefined}
+            onClick={onOpen}
+            className={clsx(
+              "w-full text-left p-3 flex items-start gap-3",
+              onOpen &&
+                "cursor-pointer hover:bg-surface/40 active:bg-surface/60 transition-colors",
+            )}
+          >
+            <img
+              src={restaurant.image}
+              alt=""
+              className="w-16 h-16 rounded-lg object-cover shrink-0"
             />
-            <span className="font-semibold text-ink">{restaurant.rating}</span>
-            <span>({restaurant.reviews})</span>
-            <span>·</span>
-            <span className="truncate">{restaurant.category}</span>
-            <span>·</span>
-            <span>{c.distance(restaurant.distanceKm)}</span>
-          </p>
-          {deals?.length > 0 && (
-            <div className="mt-1.5 flex flex-nowrap gap-1 overflow-x-auto no-scrollbar">
-              {deals.map((deal) => (
-                <span
-                  key={deal.id}
-                  className="shrink-0 inline-flex items-center py-0.5 px-2 rounded-lg bg-brand text-ink text-[11px] font-bold"
-                >
-                  {deal.title}
+            <div className="flex-1 min-w-0 pr-6">
+              <h3 className="text-[16px] font-bold text-ink truncate leading-tight">
+                {restaurant.name}
+              </h3>
+              <p className="text-[12px] text-ink-muted truncate flex items-center gap-1 mt-0.5">
+                <Star
+                  className="w-3 h-3 fill-brand-darker text-brand-darker shrink-0"
+                  strokeWidth={0}
+                />
+                <span className="font-semibold text-ink">
+                  {restaurant.rating}
                 </span>
-              ))}
+                <span>({restaurant.reviews})</span>
+                <span>·</span>
+                <span className="truncate">{restaurant.category}</span>
+                <span>·</span>
+                <span>{c.distance(restaurant.distanceKm)}</span>
+              </p>
+              {deals?.length > 0 && (
+                <div className="mt-1.5 flex flex-nowrap gap-1 overflow-x-auto no-scrollbar">
+                  {deals.map((deal) => (
+                    <span
+                      key={deal.id}
+                      className="shrink-0 inline-flex items-center py-0.5 px-2 rounded-lg bg-brand text-ink text-[11px] font-bold"
+                    >
+                      {deal.title}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </div>
+          </BodyTag>
+        );
+      })()}
     </article>
   );
 }
@@ -716,6 +750,7 @@ export function DiscoverScreen({
   bookmarkedListIds = [],
   recommendationsByDealIdForViewer = recommendationsByDealId,
   onOpenUser,
+  onOpenRestaurant,
   onToggleListBookmark,
 }) {
   const [selectedId, setSelectedId] = useState(null);
@@ -882,8 +917,10 @@ export function DiscoverScreen({
         })}
       </AnimatePresence>
 
-      {/* Top chrome — sits below the global StatusBar (top-11). */}
-      <div className="absolute top-11 inset-x-0 px-3 pt-3 flex flex-col gap-2">
+      {/* Top chrome — sits below the global StatusBar on desktop
+          (top-11); on mobile the fake StatusBar isn't rendered so we
+          tuck right up to top-0. */}
+      <div className="absolute top-0 md:top-11 inset-x-0 px-3 pt-3 flex flex-col gap-2">
         <SearchBar />
         <div className="flex gap-1 overflow-x-auto no-scrollbar -mx-3 px-3">
           {FILTER_CHIPS.map((chip) => (
@@ -911,6 +948,11 @@ export function DiscoverScreen({
                 insightIndex={insightIndex}
                 onCycleInsight={handleCycleInsight}
                 onSelectInsight={setInsightIndex}
+                onOpen={
+                  onOpenRestaurant
+                    ? () => onOpenRestaurant(selected.id)
+                    : undefined
+                }
                 onClose={() => setSelectedId(null)}
                 onOpenUser={onOpenUser}
               />
@@ -947,6 +989,7 @@ export function DiscoverScreen({
             viewerId={user?.id}
             onSelectList={handleSelectList}
             onOpenUser={onOpenUser}
+            onOpenRestaurant={onOpenRestaurant}
             onCloseList={() => setSelectedListId(null)}
             onUnbookmarkList={
               selectedList && onToggleListBookmark

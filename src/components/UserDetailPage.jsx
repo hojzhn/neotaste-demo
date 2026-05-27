@@ -1,5 +1,6 @@
 import { useState } from "react";
 import clsx from "clsx";
+import { AnimatePresence, motion } from "framer-motion";
 import { Star, Bookmark, Users } from "lucide-react";
 import { SubTabs } from "./SubTabs";
 import { Avatar } from "./Avatar";
@@ -336,74 +337,90 @@ export function UserDetailPage({
           />
         </div>
 
-        {activeTab === "reviews" ? (
-          <div className="px-4 pt-5 space-y-5">
-            {userReviews.length === 0 ? (
-              <p className="text-center text-ink-muted py-10 text-[14px]">
-                {c.emptyReviews}
-              </p>
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, x: 12 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -12 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
+            {activeTab === "reviews" ? (
+              <div className="px-4 pt-5 space-y-5">
+                {userReviews.length === 0 ? (
+                  <p className="text-center text-ink-muted py-10 text-[14px]">
+                    {c.emptyReviews}
+                  </p>
+                ) : (
+                  userReviews.map((r) => (
+                    <UserReviewItem key={r.id} review={r} />
+                  ))
+                )}
+              </div>
             ) : (
-              userReviews.map((r) => <UserReviewItem key={r.id} review={r} />)
-            )}
-          </div>
-        ) : (
-          <div className="pt-5 px-3 space-y-5">
-            {userLists.length === 0 && savedLists.length === 0 ? (
-              <p className="text-center text-ink-muted py-10 text-[14px]">
-                {c.emptyLists}
-              </p>
-            ) : (
-              <>
-                {userLists.length > 0 && (
-                  <section className="space-y-3">
-                    {isOwnProfile && (
-                      <h3 className="px-1 text-[12px] font-semibold uppercase tracking-wide text-ink-muted">
-                        {c.yourListsHeader}
-                      </h3>
+              <div className="pt-5 px-3 space-y-5">
+                {userLists.length === 0 && savedLists.length === 0 ? (
+                  <p className="text-center text-ink-muted py-10 text-[14px]">
+                    {c.emptyLists}
+                  </p>
+                ) : (
+                  <>
+                    {userLists.length > 0 && (
+                      <section className="space-y-3">
+                        {isOwnProfile && (
+                          <h3 className="px-1 text-[12px] font-semibold uppercase tracking-wide text-ink-muted">
+                            {c.yourListsHeader}
+                          </h3>
+                        )}
+                        {userLists.map((l) => (
+                          <ListCard
+                            key={l.id}
+                            list={l}
+                            isSaved={bookmarkedListIds.includes(l.id)}
+                            // Mypage: your own lists hide the bookmark toggle
+                            // entirely — you can't bookmark yourself.
+                            showBookmark={!isOwnProfile}
+                            onToggleSave={
+                              onToggleListBookmark
+                                ? () => onToggleListBookmark(l.id)
+                                : undefined
+                            }
+                            onOpen={
+                              onOpenList ? () => onOpenList(l.id) : undefined
+                            }
+                          />
+                        ))}
+                      </section>
                     )}
-                    {userLists.map((l) => (
-                      <ListCard
-                        key={l.id}
-                        list={l}
-                        isSaved={bookmarkedListIds.includes(l.id)}
-                        // Mypage: your own lists hide the bookmark toggle
-                        // entirely — you can't bookmark yourself.
-                        showBookmark={!isOwnProfile}
-                        onToggleSave={
-                          onToggleListBookmark
-                            ? () => onToggleListBookmark(l.id)
-                            : undefined
-                        }
-                        onOpen={onOpenList ? () => onOpenList(l.id) : undefined}
-                      />
-                    ))}
-                  </section>
+                    {isOwnProfile && savedLists.length > 0 && (
+                      <section className="space-y-3">
+                        <h3 className="px-1 text-[12px] font-semibold uppercase tracking-wide text-ink-muted">
+                          {c.savedListsHeader}
+                        </h3>
+                        {savedLists.map((l) => (
+                          <ListCard
+                            key={l.id}
+                            list={l}
+                            isSaved
+                            showBookmark
+                            onToggleSave={
+                              onToggleListBookmark
+                                ? () => onToggleListBookmark(l.id)
+                                : undefined
+                            }
+                            onOpen={
+                              onOpenList ? () => onOpenList(l.id) : undefined
+                            }
+                          />
+                        ))}
+                      </section>
+                    )}
+                  </>
                 )}
-                {isOwnProfile && savedLists.length > 0 && (
-                  <section className="space-y-3">
-                    <h3 className="px-1 text-[12px] font-semibold uppercase tracking-wide text-ink-muted">
-                      {c.savedListsHeader}
-                    </h3>
-                    {savedLists.map((l) => (
-                      <ListCard
-                        key={l.id}
-                        list={l}
-                        isSaved
-                        showBookmark
-                        onToggleSave={
-                          onToggleListBookmark
-                            ? () => onToggleListBookmark(l.id)
-                            : undefined
-                        }
-                        onOpen={onOpenList ? () => onOpenList(l.id) : undefined}
-                      />
-                    ))}
-                  </section>
-                )}
-              </>
+              </div>
             )}
-          </div>
-        )}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );

@@ -95,7 +95,7 @@ export const copy = {
     timeLabel: "Time",
     defaultDate: "Today",
     defaultTime: "19:00 – 22:00",
-    note: "This is a placeholder for the booking flow. Picking the time slot, party size and payment would happen here.",
+    note: "This is a placeholder for the booking flow. Picking the time slot etc. would happen here.",
     confirm: "Confirm booking",
     close: "Close",
   },

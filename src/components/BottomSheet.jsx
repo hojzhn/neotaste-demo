@@ -61,7 +61,7 @@ export function BottomSheet({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="absolute inset-0 -top-11 bg-black/40 cursor-default"
+              className="absolute inset-0 md:-top-11 bg-black/40 cursor-default"
             />
           )}
           <motion.div

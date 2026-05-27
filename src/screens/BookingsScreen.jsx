@@ -73,7 +73,24 @@ export function BookingsScreen({
   // panel and slides along with it during master-tab swaps.
   const [notificationsOrigin, setNotificationsOrigin] = useState("bookings");
   const [detailRestaurantId, setDetailRestaurantId] = useState(null);
+  // Which master tab the restaurant detail page was launched from.
+  // Mirrors the notificationsOrigin pattern: the SlideInOverlay renders
+  // inside that tab's panel so the detail slides with the tab and the
+  // user can drill into a restaurant from Discover without forcing a
+  // jump to Bookings.
+  const [detailRestaurantOrigin, setDetailRestaurantOrigin] =
+    useState("bookings");
+  function openRestaurantDetail(restaurantId, origin = "bookings") {
+    setDetailRestaurantOrigin(origin);
+    setDetailRestaurantId(restaurantId);
+  }
   const [detailUserId, setDetailUserId] = useState(null);
+  // Origin master tab for the user-detail overlay. Same idea as
+  // detailRestaurantOrigin — the overlay renders inside the panel that
+  // launched it so it slides along during master-tab swaps and the
+  // user doesn't get yanked to Bookings just for tapping a friend on
+  // the Discover map.
+  const [detailUserOrigin, setDetailUserOrigin] = useState("bookings");
   const [detailListId, setDetailListId] = useState(null);
   const [redeemingBookingId, setRedeemingBookingId] = useState(null);
   const [activeSubTab, setActiveSubTab] = useState("upcoming");
@@ -243,7 +260,7 @@ export function BookingsScreen({
     setReviewingBookingId(null);
   }
 
-  function openUserProfile(userId) {
+  function openUserProfile(userId, origin = "bookings") {
     if (!userId) return;
     if (userId === user.id) {
       // Tapping your own avatar from any avatar surface switches to the
@@ -251,6 +268,7 @@ export function BookingsScreen({
       closeAllOverlays();
       setRootView("profile");
     } else {
+      setDetailUserOrigin(origin);
       setDetailUserId(userId);
     }
   }
@@ -477,9 +495,16 @@ export function BookingsScreen({
   // Discover currently has no overlays of its own.
   const notificationsOnActive =
     notificationsOpen && notificationsOrigin === rootView;
-  const bookingsDeepOverlayOpen = !!detailRestaurantId || !!detailUserId;
+  const bookingsDeepOverlayOpen =
+    (!!detailUserId && !!detailUser && detailUserOrigin === "bookings") ||
+    (!!detailRestaurantId && detailRestaurantOrigin === "bookings");
+  const discoverDeepOverlayOpen =
+    (!!detailUserId && !!detailUser && detailUserOrigin === "discover") ||
+    (!!detailRestaurantId && detailRestaurantOrigin === "discover");
   const hasOverlayOnActiveTab =
-    notificationsOnActive || (isOnBookings && bookingsDeepOverlayOpen);
+    notificationsOnActive ||
+    (isOnBookings && bookingsDeepOverlayOpen) ||
+    (isOnDiscover && discoverDeepOverlayOpen);
 
   // Top-level back handler. Pops whichever slide-in overlay is currently
   // visible on the active tab; hidden when nothing is up. ListDetail is
@@ -489,11 +514,29 @@ export function BookingsScreen({
   const phoneBack = useMemo(() => {
     if (notificationsOnActive) return () => setNotificationsOpen(false);
     if (isOnBookings) {
-      if (detailUserId) return () => setDetailUserId(null);
-      if (detailRestaurantId) return () => setDetailRestaurantId(null);
+      if (detailUserId && detailUserOrigin === "bookings")
+        return () => setDetailUserId(null);
+      if (detailRestaurantId && detailRestaurantOrigin === "bookings") {
+        return () => setDetailRestaurantId(null);
+      }
+    }
+    if (isOnDiscover) {
+      if (detailUserId && detailUserOrigin === "discover")
+        return () => setDetailUserId(null);
+      if (detailRestaurantId && detailRestaurantOrigin === "discover") {
+        return () => setDetailRestaurantId(null);
+      }
     }
     return null;
-  }, [notificationsOnActive, isOnBookings, detailUserId, detailRestaurantId]);
+  }, [
+    notificationsOnActive,
+    isOnBookings,
+    isOnDiscover,
+    detailUserId,
+    detailUserOrigin,
+    detailRestaurantId,
+    detailRestaurantOrigin,
+  ]);
   usePushPhoneChrome("back", phoneBack);
 
   function openNotifications() {
@@ -527,6 +570,64 @@ export function BookingsScreen({
   ]);
   usePushPhoneChrome("bell", phoneBell);
 
+  // Shared RestaurantDetail body — rendered into whichever panel's
+  // SlideInOverlay matches `detailRestaurantOrigin`. Only the one
+  // whose `open` is true actually mounts its children, so the JSX
+  // safely lives in both places. `origin` propagates downward: tapping
+  // a review user from a Discover-origin restaurant detail opens that
+  // user inside the Discover panel too (not Bookings).
+  const renderRestaurantDetail = (origin = "bookings") =>
+    detailRestaurant && (
+      <RestaurantDetailPage
+        restaurant={detailRestaurant}
+        deals={detailDeals}
+        recommendationsByDealId={recommendationsByDealIdForViewer}
+        user={user}
+        friends={friends}
+        userBookings={bookings}
+        phoneGiftsUsed={phoneGiftsUsed}
+        phoneGiftLimit={phoneGiftLimit}
+        onShare={interactive ? onShare : undefined}
+        onCreateBooking={
+          interactive
+            ? (payload) => {
+                onCreateBooking?.(payload);
+                // After a confirm: drop bookings list to top, switch
+                // back to Upcoming, AND move the user back to the
+                // Bookings tab so the new booking lands where they can
+                // see it (if they opened the detail from Discover, the
+                // booking is invisible until they swap to Bookings).
+                setActiveSubTab("upcoming");
+                setRootView("bookings");
+                scrollContainerRef.current?.scrollTo({
+                  top: 0,
+                  behavior: "smooth",
+                });
+              }
+            : undefined
+        }
+        onOpenUser={(userId) => openUserProfile(userId, origin)}
+        onBack={() => setDetailRestaurantId(null)}
+      />
+    );
+
+  // Mirror of renderRestaurantDetail for UserDetailPage. Each panel
+  // that hosts a user-detail overlay passes its own origin so nested
+  // navigation (user → restaurant) stays on the same master tab.
+  const renderUserDetail = (origin = "bookings") =>
+    detailUser && (
+      <UserDetailPage
+        user={detailUser}
+        viewer={user}
+        bookmarkedListIds={bookmarkedListIds}
+        onToggleListBookmark={onToggleListBookmark}
+        onOpenRestaurant={(restaurantId) =>
+          openRestaurantDetail(restaurantId, origin)
+        }
+        onOpenList={(listId) => setDetailListId(listId)}
+      />
+    );
+
   return (
     <div className="w-full h-full flex flex-col bg-white relative overflow-hidden">
       {/* Discover tab — bleeds all the way to the top of the phone
@@ -552,8 +653,64 @@ export function BookingsScreen({
               recommendationsByDealIdForViewer={
                 recommendationsByDealIdForViewer
               }
-              onOpenUser={openUserProfile}
+              onOpenUser={(userId) => openUserProfile(userId, "discover")}
+              onOpenRestaurant={(restaurantId) =>
+                openRestaurantDetail(restaurantId, "discover")
+              }
             />
+
+            {/* Backdrop strip covering the desktop StatusBar area.
+                Discover's map normally bleeds behind the fake
+                StatusBar (which has no background of its own) — but
+                while ANY discover-origin overlay (restaurant detail
+                or user detail) is on top of Discover, we want a clean
+                white sheet under the time/icons rather than map
+                texture showing through. Mobile already gets full-bleed
+                overlays so it doesn't need this. */}
+            <AnimatePresence>
+              {discoverDeepOverlayOpen && (
+                <motion.div
+                  key="discover-overlay-statusbar-backdrop"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="hidden md:block absolute top-0 inset-x-0 h-11 z-90 bg-white pointer-events-none"
+                />
+              )}
+            </AnimatePresence>
+
+            {/* Restaurant detail rendered inside the Discover panel —
+                slides in over the map without forcing a swap to the
+                Bookings tab. Starts at top-11 on desktop so the fake
+                StatusBar (z-50 in PhoneFrame) stays visible above it,
+                matching the Bookings-panel inset and giving the global
+                back button (top-12) the same 88px landing zone above
+                the page body. The bookings-panel copy of this overlay
+                is gated by detailRestaurantOrigin so only one mounts
+                at a time. */}
+            <SlideInOverlay
+              open={
+                !!detailRestaurant && detailRestaurantOrigin === "discover"
+              }
+              snapClose={snapCloseOverlays}
+              className="absolute top-0 md:top-11 inset-x-0 bottom-0 z-90 bg-white"
+            >
+              {renderRestaurantDetail("discover")}
+            </SlideInOverlay>
+
+            {/* User detail rendered inside the Discover panel —
+                rendered after the restaurant overlay so it paints on
+                top when both are open (e.g. a Discover-origin
+                restaurant detail → review user). Same origin gating
+                pattern as restaurant detail. */}
+            <SlideInOverlay
+              open={!!detailUser && detailUserOrigin === "discover"}
+              snapClose={snapCloseOverlays}
+              className="absolute top-0 md:top-11 inset-x-0 bottom-0 z-90 bg-white"
+            >
+              {renderUserDetail("discover")}
+            </SlideInOverlay>
           </motion.div>
         )}
       </AnimatePresence>
@@ -565,7 +722,7 @@ export function BookingsScreen({
       <motion.div
         animate={{ x: panelOffset("bookings") }}
         transition={{ type: "spring", stiffness: 380, damping: 36 }}
-        className="absolute inset-x-0 top-11 bottom-20 flex flex-col"
+        className="absolute inset-x-0 top-0 md:top-11 bottom-20 flex flex-col"
       >
         {/* Compact title — fades + un-blurs in once the large title has scrolled past the threshold. */}
         <div
@@ -604,8 +761,16 @@ export function BookingsScreen({
             active={activeSubTab}
             onChange={interactive ? setActiveSubTab : undefined}
           />
-          <div className="px-4 pt-5 pb-24 space-y-5">
-            {activeSubTab === "upcoming" && pendingInvitations.length > 0 && (
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.div
+              key={activeSubTab}
+              initial={{ opacity: 0, x: 12 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -12 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="px-4 pt-5 pb-24 space-y-5"
+            >
+              {activeSubTab === "upcoming" && pendingInvitations.length > 0 && (
               <section className="space-y-2">
                 <h2 className="px-2 text-[12px] font-semibold uppercase tracking-wide text-ink-muted">
                   {copy.invitations.sectionTitle}
@@ -668,10 +833,10 @@ export function BookingsScreen({
                               : undefined
                           }
                           onOpenDetail={() =>
-                            setDetailRestaurantId(restaurant.id)
+                            openRestaurantDetail(restaurant.id, "bookings")
                           }
                           onBookAgain={() =>
-                            setDetailRestaurantId(restaurant.id)
+                            openRestaurantDetail(restaurant.id, "bookings")
                           }
                         />
                       );
@@ -718,7 +883,7 @@ export function BookingsScreen({
                         ? () => setFlow({ booking, type: "dine", step: "pick" })
                         : undefined
                     }
-                    onOpenDetail={() => setDetailRestaurantId(restaurant.id)}
+                    onOpenDetail={() => openRestaurantDetail(restaurant.id, "bookings")}
                     onRedeem={
                       interactive && !isHistory
                         ? () => setRedeemingBookingId(booking.id)
@@ -728,7 +893,8 @@ export function BookingsScreen({
                 );
               })
             )}
-          </div>
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         {/* Bookings-tab overlays — render INSIDE this panel so they
@@ -747,7 +913,7 @@ export function BookingsScreen({
             onDeclineShare={interactive ? onDeclineShare : undefined}
             onSeeInformation={(restaurantId) => {
               setNotificationsOpen(false);
-              setDetailRestaurantId(restaurantId);
+              openRestaurantDetail(restaurantId, "bookings");
             }}
             onSeeBookings={() => {
               setNotificationsOpen(false);
@@ -767,63 +933,19 @@ export function BookingsScreen({
         </SlideInOverlay>
 
         <SlideInOverlay
-          open={!!detailRestaurant}
+          open={!!detailRestaurant && detailRestaurantOrigin === "bookings"}
           snapClose={snapCloseOverlays}
           className="absolute top-0 inset-x-0 bottom-0 z-40 bg-white"
         >
-          {detailRestaurant && (
-            <RestaurantDetailPage
-              restaurant={detailRestaurant}
-              deals={detailDeals}
-              recommendationsByDealId={recommendationsByDealIdForViewer}
-              user={user}
-              friends={friends}
-              userBookings={bookings}
-              phoneGiftsUsed={phoneGiftsUsed}
-              phoneGiftLimit={phoneGiftLimit}
-              onShare={interactive ? onShare : undefined}
-              onCreateBooking={
-                interactive
-                  ? (payload) => {
-                      onCreateBooking?.(payload);
-                      // Drop the bookings list back to the top *and*
-                      // flip back to Upcoming so the freshly-confirmed
-                      // booking is the first thing the user sees once
-                      // the detail page slides off. (If they were on
-                      // History when they opened the detail page, the
-                      // tab would otherwise stay on History and the
-                      // new booking would be invisible.)
-                      setActiveSubTab("upcoming");
-                      scrollContainerRef.current?.scrollTo({
-                        top: 0,
-                        behavior: "smooth",
-                      });
-                    }
-                  : undefined
-              }
-              onOpenUser={openUserProfile}
-              onBack={() => setDetailRestaurantId(null)}
-            />
-          )}
+          {renderRestaurantDetail("bookings")}
         </SlideInOverlay>
 
         <SlideInOverlay
-          open={!!detailUser}
+          open={!!detailUser && detailUserOrigin === "bookings"}
           snapClose={snapCloseOverlays}
           className="absolute top-0 inset-x-0 bottom-0 z-40 bg-white"
         >
-          {detailUser && (
-            <UserDetailPage
-              user={detailUser}
-              viewer={user}
-              bookmarkedListIds={bookmarkedListIds}
-              onToggleListBookmark={onToggleListBookmark}
-              onOpenRestaurant={(restaurantId) =>
-                setDetailRestaurantId(restaurantId)
-              }
-              onOpenList={(listId) => setDetailListId(listId)}
-            />
-          )}
+          {renderUserDetail("bookings")}
         </SlideInOverlay>
       </motion.div>
 
@@ -833,14 +955,14 @@ export function BookingsScreen({
       <motion.div
         animate={{ x: panelOffset("profile") }}
         transition={{ type: "spring", stiffness: 380, damping: 36 }}
-        className="absolute inset-x-0 top-11 bottom-20 bg-white"
+        className="absolute inset-x-0 top-0 md:top-11 bottom-20 bg-white"
       >
         <MyProfileScreen
           user={user}
           bookmarkedListIds={bookmarkedListIds}
           onToggleListBookmark={onToggleListBookmark}
           onOpenRestaurant={(restaurantId) =>
-            setDetailRestaurantId(restaurantId)
+            openRestaurantDetail(restaurantId, "bookings")
           }
           onOpenList={(listId) => setDetailListId(listId)}
           onOpenNotifications={openNotifications}
@@ -860,7 +982,7 @@ export function BookingsScreen({
             onDeclineShare={interactive ? onDeclineShare : undefined}
             onSeeInformation={(restaurantId) => {
               setNotificationsOpen(false);
-              setDetailRestaurantId(restaurantId);
+              openRestaurantDetail(restaurantId, "bookings");
               setRootView("bookings");
             }}
             onSeeBookings={() => {
@@ -889,8 +1011,25 @@ export function BookingsScreen({
         onSelectDiscover={
           interactive
             ? () => {
-                // Same flow as Profile — overlays stay parked on their
-                // origin tab; tab swap is purely cosmetic. No close.
+                // Re-tapping Discover while a Discover-origin overlay is
+                // open pops it (the chevron's job, but the tab tap is
+                // the user's instinct). User detail wins over restaurant
+                // detail when both are stacked so the pop matches what's
+                // visually on top. Otherwise it's a plain tab swap and
+                // overlays stay parked on their origin.
+                if (rootView === "discover") {
+                  if (detailUserId && detailUserOrigin === "discover") {
+                    setDetailUserId(null);
+                    return;
+                  }
+                  if (
+                    detailRestaurantId &&
+                    detailRestaurantOrigin === "discover"
+                  ) {
+                    setDetailRestaurantId(null);
+                    return;
+                  }
+                }
                 setRootView("discover");
               }
             : undefined

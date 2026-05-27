@@ -99,7 +99,7 @@ export function PhoneFrame({
             exit={{ opacity: 0, scale: 0.6 }}
             transition={CHROME_TRANSITION}
             style={{ top: BELL_TOP_HIGH }}
-            className="absolute left-3 z-49 w-10 h-10 rounded-lg bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.15)] border border-black/5 flex items-center justify-center hover:bg-surface active:scale-95"
+            className="absolute left-3 z-99 w-10 h-10 rounded-full bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.15)] border border-black/5 flex items-center justify-center hover:bg-surface active:scale-95"
           >
             <ChevronLeft className="w-5 h-5 text-ink" strokeWidth={2.5} />
           </motion.button>
@@ -120,8 +120,7 @@ export function PhoneFrame({
             animate={{
               opacity: 1,
               scale: 1,
-              top:
-                activeBell.position === "low" ? BELL_TOP_LOW : BELL_TOP_HIGH,
+              top: activeBell.position === "low" ? BELL_TOP_LOW : BELL_TOP_HIGH,
             }}
             exit={{ opacity: 0, scale: 0.6 }}
             transition={CHROME_TRANSITION}
