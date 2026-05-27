@@ -643,6 +643,14 @@ export function BookingsScreen({
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
             transition={{ type: "spring", stiffness: 380, damping: 36 }}
+            // `isolation: isolate` forces a real stacking context on
+            // this panel so the inner z-90 SlideInOverlay + z-80
+            // floating card stay sealed inside. Without it, framer-
+            // motion's transform alone doesn't reliably create the
+            // stacking context, and z-90 escapes — painting above the
+            // TabBar (z-45) and the top-level ListDetail BottomSheet
+            // (z-70), neither of which we want.
+            style={{ isolation: "isolate" }}
             className="absolute inset-x-0 top-0 bottom-20 bg-white"
           >
             <DiscoverScreen
@@ -1175,12 +1183,15 @@ export function BookingsScreen({
       {/* ListDetail is a BottomSheet — it isn't anchored to any master
           tab so opening it from mypage or from a deeper user profile
           both work; it stays put across tab swaps until the user drags
-          it down or taps the backdrop. */}
-      <BottomSheet
-        open={!!detailList}
-        onClose={() => setDetailListId(null)}
-        initialSnap="full"
-      >
+          it down or taps the backdrop. The `z-100` shell paints the
+          sheet above the global back chevron (z-99) so the underlying
+          page's back affordance doesn't show through the sheet. */}
+      <div className="absolute inset-0 z-100 pointer-events-none">
+        <BottomSheet
+          open={!!detailList}
+          onClose={() => setDetailListId(null)}
+          initialSnap="full"
+        >
         {detailList && (
           <ListDetailPage
             list={detailList}
@@ -1195,7 +1206,8 @@ export function BookingsScreen({
             onClose={() => setDetailListId(null)}
           />
         )}
-      </BottomSheet>
+        </BottomSheet>
+      </div>
 
       <AnimatePresence>
         {redeemingBooking && redeemingDeal && redeemingRestaurant && (

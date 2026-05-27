@@ -50,7 +50,7 @@ export function BottomSheet({
     <AnimatePresence>
       {open && (
         <div
-          className={`absolute inset-0 z-70 ${showBackdrop ? "" : "pointer-events-none"}`}
+          className={`absolute inset-0 z-70 ${showBackdrop ? "pointer-events-auto" : "pointer-events-none"}`}
         >
           {showBackdrop && (
             <motion.button
