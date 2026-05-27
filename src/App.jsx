@@ -610,7 +610,7 @@ function FlipButton({ currentUser, highlight, onClick }) {
       aria-label="Flip to the other user's screen"
       whileTap={{ scale: 0.92, rotate: 180 }}
       transition={{ type: "spring", stiffness: 360, damping: 22 }}
-      className="fixed bottom-3 left-3 z-60 w-14 h-14 rounded-full bg-white shadow-[0_4px_16px_-4px_rgba(0,0,0,0.35)] border border-black/5 flex items-center justify-center active:scale-95"
+      className="fixed bottom-20 left-3 z-60 w-14 h-14 rounded-full bg-white shadow-[0_4px_16px_-4px_rgba(0,0,0,0.35)] border border-black/5 flex items-center justify-center active:scale-95"
     >
       <Avatar
         initials={currentUser.initials}

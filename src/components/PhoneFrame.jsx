@@ -14,9 +14,12 @@ import { StatusBar } from "./StatusBar";
 // Bell Y positions in pixels from the top of the phone. "low" sits just
 // under the big "Bookings" headline; "high" tucks up under the status
 // bar once the user has scrolled or moved to a tab with no in-page
-// headline (Profile, etc).
+// headline (Profile, etc). On `naked` (mobile) there's no fake
+// StatusBar above, so both anchors shift up by the 44px bar height —
+// otherwise the chrome floats noticeably too low on the device.
 const BELL_TOP_HIGH = 48;
 const BELL_TOP_LOW = 88;
+const NAKED_TOP_OFFSET = -44;
 const CHROME_TRANSITION = { type: "spring", stiffness: 380, damping: 32 };
 
 // Stack-based phone chrome. Both the back chevron (top-left) and the bell
@@ -69,6 +72,9 @@ export function PhoneFrame({
   const ctxValue = useMemo(() => ({ push }), [push]);
   const activeBack = stacks.back[stacks.back.length - 1]?.value ?? null;
   const activeBell = stacks.bell[stacks.bell.length - 1]?.value ?? null;
+  const topShift = naked ? NAKED_TOP_OFFSET : 0;
+  const bellTopHigh = BELL_TOP_HIGH + topShift;
+  const bellTopLow = BELL_TOP_LOW + topShift;
 
   // The chrome (children + global back/bell/StatusBar) renders into a
   // single positioning root. Bezel + naked differ only in what wraps it.
@@ -98,7 +104,7 @@ export function PhoneFrame({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.6 }}
             transition={CHROME_TRANSITION}
-            style={{ top: BELL_TOP_HIGH }}
+            style={{ top: bellTopHigh }}
             className="absolute left-3 z-99 w-10 h-10 rounded-full bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.15)] border border-black/5 flex items-center justify-center hover:bg-surface active:scale-95"
           >
             <ChevronLeft className="w-5 h-5 text-ink" strokeWidth={2.5} />
@@ -120,7 +126,7 @@ export function PhoneFrame({
             animate={{
               opacity: 1,
               scale: 1,
-              top: activeBell.position === "low" ? BELL_TOP_LOW : BELL_TOP_HIGH,
+              top: activeBell.position === "low" ? bellTopLow : bellTopHigh,
             }}
             exit={{ opacity: 0, scale: 0.6 }}
             transition={CHROME_TRANSITION}
