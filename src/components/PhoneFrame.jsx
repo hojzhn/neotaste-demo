@@ -42,6 +42,10 @@ export function PhoneFrame({
   label,
   sublabel,
   statusBarDark = false,
+  // When `naked`, drop the desktop bezel + caption and render the
+  // screen contents into a fixed full-viewport surface — used by the
+  // mobile App layout so the demo fills the device with no chrome.
+  naked = false,
   children,
 }) {
   const hasUser = !!user;
@@ -65,6 +69,85 @@ export function PhoneFrame({
   const ctxValue = useMemo(() => ({ push }), [push]);
   const activeBack = stacks.back[stacks.back.length - 1]?.value ?? null;
   const activeBell = stacks.bell[stacks.bell.length - 1]?.value ?? null;
+
+  // The chrome (children + global back/bell/StatusBar) renders into a
+  // single positioning root. Bezel + naked differ only in what wraps it.
+  const screen = (
+    <div
+      className={
+        naked
+          ? "fixed inset-0 overflow-hidden bg-white"
+          : "w-full h-full rounded-[46px] overflow-hidden bg-white relative"
+      }
+    >
+      <PhoneChromeContext.Provider value={ctxValue}>
+        {children}
+      </PhoneChromeContext.Provider>
+
+      {/* Global back chevron — fixed top-left position so the user
+          always reaches for the same spot. Fades + scales in on
+          appear, out on disappear. */}
+      <AnimatePresence>
+        {activeBack && (
+          <motion.button
+            key="phone-back"
+            type="button"
+            onClick={activeBack}
+            aria-label="Back"
+            initial={{ opacity: 0, scale: 0.6 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.6 }}
+            transition={CHROME_TRANSITION}
+            style={{ top: BELL_TOP_HIGH }}
+            className="absolute left-3 z-49 w-10 h-10 rounded-lg bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.15)] border border-black/5 flex items-center justify-center hover:bg-surface active:scale-95"
+          >
+            <ChevronLeft className="w-5 h-5 text-ink" strokeWidth={2.5} />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* Global bell — chevron-mirror position with Y animating between
+          two anchors per active screen. Hidden whenever a deep slide-in
+          page is on top. */}
+      <AnimatePresence>
+        {activeBell && (
+          <motion.button
+            key="phone-bell"
+            type="button"
+            onClick={activeBell.onClick}
+            aria-label="Notifications"
+            initial={{ opacity: 0, scale: 0.6 }}
+            animate={{
+              opacity: 1,
+              scale: 1,
+              top:
+                activeBell.position === "low" ? BELL_TOP_LOW : BELL_TOP_HIGH,
+            }}
+            exit={{ opacity: 0, scale: 0.6 }}
+            transition={CHROME_TRANSITION}
+            className="absolute right-3 z-49 w-10 h-10 rounded-full bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.15)] border border-black/5 flex items-center justify-center hover:bg-surface active:scale-95"
+          >
+            <Bell className="w-5 h-5 text-ink" strokeWidth={2.25} />
+            {activeBell.hasNotifications && (
+              <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-error ring-2 ring-white" />
+            )}
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* Single global StatusBar per phone — floats above every
+          in-app overlay (including the redeem flow at z-50 and the
+          raised TabBar at z-45). Tone is driven by whatever screen
+          is currently dominant, lifted through App. */}
+      <div className="absolute top-0 inset-x-0 z-50 pointer-events-none">
+        <StatusBar dark={statusBarDark} />
+      </div>
+    </div>
+  );
+
+  if (naked) {
+    return screen;
+  }
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -92,76 +175,8 @@ export function PhoneFrame({
           </div>
         </div>
       )}
-      <div className="relative w-[390px] h-[844px] bg-black rounded-[54px] p-[10px]">
-        <div className="w-full h-full rounded-[46px] overflow-hidden bg-white relative">
-          <PhoneChromeContext.Provider value={ctxValue}>
-            {children}
-          </PhoneChromeContext.Provider>
-
-          {/* Global back chevron. Sits at a fixed top-left position
-              across every screen so the user always reaches for the same
-              spot. Fades + scales in on appear, out on disappear.
-              Visibility + behaviour come from whatever screen is on top
-              of the chrome stack. */}
-          <AnimatePresence>
-            {activeBack && (
-              <motion.button
-                key="phone-back"
-                type="button"
-                onClick={activeBack}
-                aria-label="Back"
-                initial={{ opacity: 0, scale: 0.6 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.6 }}
-                transition={CHROME_TRANSITION}
-                style={{ top: BELL_TOP_HIGH }}
-                className="absolute left-3 z-49 w-10 h-10 rounded-lg bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.15)] border border-black/5 flex items-center justify-center hover:bg-surface active:scale-95"
-              >
-                <ChevronLeft className="w-5 h-5 text-ink" strokeWidth={2.5} />
-              </motion.button>
-            )}
-          </AnimatePresence>
-
-          {/* Global bell. Same chevron-mirror position, but its Y
-              animates between two anchors depending on the current
-              screen (low under the big headline, high under the status
-              bar). Hidden whenever a deep slide-in page is on top. */}
-          <AnimatePresence>
-            {activeBell && (
-              <motion.button
-                key="phone-bell"
-                type="button"
-                onClick={activeBell.onClick}
-                aria-label="Notifications"
-                initial={{ opacity: 0, scale: 0.6 }}
-                animate={{
-                  opacity: 1,
-                  scale: 1,
-                  top:
-                    activeBell.position === "low"
-                      ? BELL_TOP_LOW
-                      : BELL_TOP_HIGH,
-                }}
-                exit={{ opacity: 0, scale: 0.6 }}
-                transition={CHROME_TRANSITION}
-                className="absolute right-3 z-49 w-10 h-10 rounded-full bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.15)] border border-black/5 flex items-center justify-center hover:bg-surface active:scale-95"
-              >
-                <Bell className="w-5 h-5 text-ink" strokeWidth={2.25} />
-                {activeBell.hasNotifications && (
-                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-error ring-2 ring-white" />
-                )}
-              </motion.button>
-            )}
-          </AnimatePresence>
-
-          {/* Single global StatusBar per phone — floats above every
-              in-app overlay (including the redeem flow at z-50 and the
-              raised TabBar at z-45). Tone is driven by whatever screen
-              is currently dominant, lifted through App. */}
-          <div className="absolute top-0 inset-x-0 z-50 pointer-events-none">
-            <StatusBar dark={statusBarDark} />
-          </div>
-        </div>
+      <div className="relative w-97.5 h-211 bg-black rounded-[54px] p-2.5">
+        {screen}
       </div>
     </div>
   );

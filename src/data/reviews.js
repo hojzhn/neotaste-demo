@@ -431,6 +431,72 @@ export const reviews = [
     photos: [],
     likes: 38,
   },
+
+  // ── Friend reviews — written by people in Arabel & Hicks's friend
+  // graphs (anna / felix / hannah are mutual). These drive the "X was
+  // here" banner on the DiscoverScreen selected card when there's no
+  // targeted recommendation. Spread across restaurants that don't have
+  // recs of their own so the banner has somewhere to land.
+  {
+    id: "r-morg-1",
+    restaurantId: "morgenstern",
+    userId: "anna",
+    rating: 5,
+    text: "Best brunch I've had in months, no exaggeration. The poached eggs on labneh thing? Get that. Get coffee. Get the orange juice. Get everything!",
+    ageDays: 6,
+    photos: [],
+    likes: 41,
+  },
+  {
+    id: "r-tofu-2",
+    restaurantId: "tofu-and-co",
+    userId: "felix",
+    rating: 5,
+    text: "ok so even my flatmate who hates vegan food kept stealing from my bowl. the peanut sauce on the rice paper rolls is a war crime in the best way",
+    ageDays: 4,
+    photos: [],
+    likes: 28,
+  },
+  {
+    id: "r-pizz-1",
+    restaurantId: "pizzeria-stella",
+    userId: "felix",
+    rating: 4,
+    text: "service was a little slow on a friday but the pizza was worth it. the diavola got me good, my mouth still tingles thinking about it",
+    ageDays: 11,
+    photos: [],
+    likes: 16,
+  },
+  {
+    id: "r-masala-1",
+    restaurantId: "masala-house",
+    userId: "hannah",
+    rating: 5,
+    text: "I came for the daal and stayed for everything else. Properly spiced, generous portions, and the staff genuinely seemed delighted that I was delighted. Going back this weekend.",
+    ageDays: 8,
+    photos: [],
+    likes: 52,
+  },
+  {
+    id: "r-kombi-1",
+    restaurantId: "kombi-kitchen",
+    userId: "hannah",
+    rating: 5,
+    text: "Two of us, three small plates, completely full. The mapo tofu is one of the best things I've had in Berlin this year they really commit to the heat instead of toning it down.",
+    ageDays: 13,
+    photos: [],
+    likes: 67,
+  },
+  {
+    id: "r-flamm-1",
+    restaurantId: "flammkuchen-haus",
+    userId: "anna",
+    rating: 4,
+    text: "Cozy little spot, the kind of place you stumble into and end up staying for two hours. Order the flammkuchen with goat cheese (trust me on this one)",
+    ageDays: 15,
+    photos: [],
+    likes: 22,
+  },
 ];
 
 export const reviewsByRestaurantId = reviews.reduce((acc, r) => {

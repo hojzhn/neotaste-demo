@@ -281,15 +281,36 @@ function TicketStep({
               alt=""
               className="w-full h-full object-cover"
             />
+            {/* Gifter chip floats on the cover image so it doesn't
+                grow the card body — the deal card has a fixed slot in
+                the redeem flow and adding a row inside would push the
+                bottom (time / slide-to-redeem) off-screen. */}
+            {gifter && (
+              <div className="absolute top-2 left-2 inline-flex items-center gap-1.5 py-1 pl-1 pr-2.5 rounded-lg bg-white/95 shadow-[0_2px_6px_-2px_rgba(0,0,0,0.25)] text-[11px] font-semibold text-ink">
+                <span className="relative shrink-0">
+                  <Avatar
+                    initials={gifter.initials}
+                    color={gifter.avatarColor}
+                    image={gifter.avatarImage}
+                    size={20}
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-error ring-2 ring-white flex items-center justify-center"
+                  >
+                    <Gift
+                      className="w-2 h-2 text-white"
+                      strokeWidth={2.5}
+                      fill="currentColor"
+                    />
+                  </span>
+                </span>
+                {copy.bookingCard.gifted(gifter.name)}
+              </div>
+            )}
           </div>
 
           <div className="px-5 pt-4 pb-5">
-            {gifter && (
-              <span className="inline-flex items-center gap-1.5 py-1 px-2 rounded-md bg-error text-white text-[10px] font-semibold ">
-                <Gift className="w-3.5 h-3.5" strokeWidth={2.5} />
-                {copy.bookingCard.gifted(gifter.name)}
-              </span>
-            )}
             <h2 className="text-[22px] font-bold text-ink leading-tight">
               {restaurant.name}
             </h2>

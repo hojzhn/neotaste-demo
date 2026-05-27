@@ -3,6 +3,13 @@ export const copy = {
     title: "NeoTaste — Two-user demo",
     subtitle: "Gift a deal (with a note) or invite up to 3 friends to dine.",
   },
+  intro: {
+    title: "It's a two-phone demo.",
+    body: "Both screens are live. Gift Hicks a deal from Arabel and watch the toast land next door. Invite to a dinner, thank someone for a rec, swipe between tabs, spy on other people's profiles.",
+    mobileNote:
+      "On a phone? Tap the avatar in the bottom-left to flip between the two users. The red dot lights up when the other one has news.",
+    cta: "Let me in",
+  },
   tabs: {
     home: "Home",
     feed: "Feed",

@@ -43,7 +43,7 @@ export function TabBar({
               isActive ? 'bg-ink text-white' : 'text-ink-muted',
               interactive
                 ? 'cursor-pointer active:scale-95 transition'
-                : 'cursor-default',
+                : 'cursor-default opacity-40',
             )}
           >
             <Icon className="w-5 h-5" strokeWidth={2} />

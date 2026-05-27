@@ -123,24 +123,6 @@ export function ListDetailPage({
               <h1 className="text-[28px] font-bold text-ink leading-tight">
                 {list.name}
               </h1>
-              <div className="flex-row flex gap-2">
-                {list.friendsOnly && (
-                  <span className="flex items-center gap-1.5 h-6 px-2.5 rounded-md bg-brand-darker text-brand text-[11px] font-bold mb-2">
-                    <Users className="w-3 h-3" strokeWidth={2.5} />
-                    {c.friendsOnly}
-                  </span>
-                )}{" "}
-                {bookmarkLabel && (
-                  <span className="flex items-center gap-1 h-6 px-2 rounded-md bg-surface text-ink-muted text-[11px] font-semibold">
-                    <Bookmark
-                      className="w-3 h-3"
-                      strokeWidth={2.5}
-                      fill={isBookmarked ? "currentColor" : "none"}
-                    />
-                    {c.listSavedBy(bookmarkLabel)}
-                  </span>
-                )}
-              </div>
             </div>
             <div className="px-3 py-2 shrink-0 flex gap-2 items-center justify-end">
               {!isOwnList && (
@@ -173,6 +155,24 @@ export function ListDetailPage({
                 <X className="w-5 h-5 text-ink" strokeWidth={2.5} />
               </button>
             </div>
+          </div>
+          <div className="flex-row flex gap-2">
+            {list.friendsOnly && (
+              <span className="flex items-center gap-1.5 h-6 px-2.5 rounded-md bg-brand-darker text-brand text-[11px] font-bold mb-2">
+                <Users className="w-3 h-3" strokeWidth={2.5} />
+                {c.friendsOnly}
+              </span>
+            )}{" "}
+            {bookmarkLabel && (
+              <span className="flex items-center gap-1 h-6 px-2 rounded-md bg-surface text-ink-muted text-[11px] font-semibold">
+                <Bookmark
+                  className="w-3 h-3"
+                  strokeWidth={2.5}
+                  fill={isBookmarked ? "currentColor" : "none"}
+                />
+                {c.listSavedBy(bookmarkLabel)}
+              </span>
+            )}
           </div>
           {list.description && (
             <p className="text-[14px] text-ink-muted leading-snug">

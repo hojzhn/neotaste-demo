@@ -1,5 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { PhoneFrame } from "./components/PhoneFrame";
+import { Avatar } from "./components/Avatar";
+import { Loader } from "./components/Loader";
+import { IntroModal } from "./components/IntroModal";
 import { BookingsScreen } from "./screens/BookingsScreen";
 import { users, usersById } from "./data/users";
 import { bookings as seedBookings } from "./data/bookings";
@@ -51,6 +55,71 @@ function App() {
       prev[userId] === tone ? prev : { ...prev, [userId]: tone },
     );
   }
+
+  // Per-user "notifications seen" timestamp. Lifted out of BookingsScreen
+  // so the mobile flip-button can light up when the OTHER user has a
+  // fresh inbound share. Starts at 0 so existing seed shares register as
+  // unread on first load.
+  const [notificationsSeenAtByUserId, setNotificationsSeenAtByUserId] =
+    useState({});
+  function handleMarkNotificationsSeen(userId, ts) {
+    if (!userId) return;
+    setNotificationsSeenAtByUserId((prev) => ({ ...prev, [userId]: ts }));
+  }
+  // Most recent inbound (not just self-sent) share involving this user.
+  // Mirrors the dedupe rules from BookingsScreen.notifications so the
+  // unread signal matches what the in-app bell badge surfaces.
+  function latestIncomingFor(userId) {
+    let latest = 0;
+    for (const s of shares) {
+      const involvesUser = s.toUserId === userId || s.fromUserId === userId;
+      if (!involvesUser) continue;
+      if (s.fromUserId === userId) {
+        if (s.type === "gift" || s.type === "thank" || s.type === "recommend") {
+          continue;
+        }
+        if (s.type === "dine" && s.status === "pending") continue;
+      }
+      const ts = s.lastUpdatedAt ?? s.createdAt ?? 0;
+      if (ts > latest) latest = ts;
+    }
+    return latest;
+  }
+  function hasUnreadFor(userId) {
+    const seenAt = notificationsSeenAtByUserId[userId] ?? 0;
+    return latestIncomingFor(userId) > seenAt;
+  }
+
+  // Mobile-only: which phone is currently in the foreground. Tapping
+  // the flip FAB toggles this; the desktop two-phone layout ignores it.
+  const [mobileActiveUserId, setMobileActiveUserId] = useState(arabel.id);
+
+  // Loader gate — covers everything until the initial subresource pass
+  // (the basemap image, avatar photos, etc.) has settled. Uses
+  // window.load if it hasn't fired yet; falls back to a minimum visible
+  // time so the loader doesn't flash for a single frame on a hot
+  // cache. Once the loader fades out the IntroModal slides in to set
+  // the "this is a two-phone demo" expectation.
+  const [loading, setLoading] = useState(true);
+  const [introOpen, setIntroOpen] = useState(false);
+  useEffect(() => {
+    const MIN_VISIBLE_MS = 700;
+    const start = Date.now();
+    function finish() {
+      const elapsed = Date.now() - start;
+      const remaining = Math.max(0, MIN_VISIBLE_MS - elapsed);
+      setTimeout(() => {
+        setLoading(false);
+        setIntroOpen(true);
+      }, remaining);
+    }
+    if (document.readyState === "complete") {
+      finish();
+      return;
+    }
+    window.addEventListener("load", finish, { once: true });
+    return () => window.removeEventListener("load", finish);
+  }, []);
 
   function handleToggleListBookmark(userId, listId) {
     if (!userId || !listId) return;
@@ -420,77 +489,144 @@ function App() {
   const arabelFriends = arabel.friendIds.map((id) => usersById[id]);
   const hicksFriends = hicks.friendIds.map((id) => usersById[id]);
 
+  // Build the per-user BookingsScreen props once. Both the desktop
+  // two-phone layout and the mobile single-phone layout consume the
+  // same object so the two stay in lockstep.
+  function bookingsScreenPropsFor(user) {
+    const friends = user.id === arabel.id ? arabelFriends : hicksFriends;
+    return {
+      user,
+      bookings: bookingsForUser(user.id),
+      pendingInvitations: pendingInvitationsForUser(user.id),
+      friends,
+      shares,
+      phoneGiftsUsed: phoneGiftsUsedBy(user.id),
+      phoneGiftLimit: OUTSIDER_GIFT_LIMIT,
+      onShare: handleShare,
+      onAcceptShare: handleAcceptShare,
+      onDeclineShare: handleDeclineShare,
+      onCreateBooking: ({ deal }) =>
+        handleCreateBooking({ userId: user.id, deal }),
+      onRedeemBooking: handleRedeemBooking,
+      onSaveReview: handleSaveReview,
+      bookmarkedListIds: bookmarksByUserId[user.id] ?? [],
+      onToggleListBookmark: (listId) =>
+        handleToggleListBookmark(user.id, listId),
+      onSetStatusBarTone: (tone) => handleSetStatusBarTone(user.id, tone),
+      notificationsSeenAt: notificationsSeenAtByUserId[user.id] ?? 0,
+      onMarkNotificationsSeen: (ts) => handleMarkNotificationsSeen(user.id, ts),
+      interactive: true,
+    };
+  }
+
+  const mobileActiveUser = mobileActiveUserId === arabel.id ? arabel : hicks;
+  const mobileOtherUser = mobileActiveUserId === arabel.id ? hicks : arabel;
+  const mobileOtherHasUnread = hasUnreadFor(mobileOtherUser.id);
+
   return (
-    <main className="min-h-screen w-full flex flex-col items-center justify-start py-12 px-6 gap-10">
-      <header className="max-w-3xl text-center space-y-2">
-        {/* <h1 className="text-[32px] font-bold text-ink">{copy.app.title}</h1>
-        <p className="text-ink-muted">{copy.app.subtitle}</p> */}
-      </header>
-      <div className="flex flex-wrap items-start justify-center gap-12">
-        <PhoneFrame
-          user={arabel}
-          role="User A"
-          statusBarDark={statusBarToneByUserId[arabel.id] === "dark"}
-        >
-          <BookingsScreen
+    <>
+      {/* Desktop / wide-viewport layout — two phones side by side
+          with the bezels. Hidden on phones. */}
+      <main className="hidden md:flex min-h-screen w-full flex-col items-center justify-start py-12 px-6 gap-10">
+        <header className="max-w-3xl text-center space-y-2" />
+        <div className="flex flex-wrap items-start justify-center gap-12">
+          <PhoneFrame
             user={arabel}
-            bookings={bookingsForUser(arabel.id)}
-            pendingInvitations={pendingInvitationsForUser(arabel.id)}
-            friends={arabelFriends}
-            shares={shares}
-            phoneGiftsUsed={phoneGiftsUsedBy(arabel.id)}
-            phoneGiftLimit={OUTSIDER_GIFT_LIMIT}
-            onShare={handleShare}
-            onAcceptShare={handleAcceptShare}
-            onDeclineShare={handleDeclineShare}
-            onCreateBooking={({ deal }) =>
-              handleCreateBooking({ userId: arabel.id, deal })
-            }
-            onRedeemBooking={handleRedeemBooking}
-            onSaveReview={handleSaveReview}
-            bookmarkedListIds={bookmarksByUserId[arabel.id] ?? []}
-            onToggleListBookmark={(listId) =>
-              handleToggleListBookmark(arabel.id, listId)
-            }
-            onSetStatusBarTone={(tone) =>
-              handleSetStatusBarTone(arabel.id, tone)
-            }
-            interactive
-          />
-        </PhoneFrame>
-        <PhoneFrame
-          user={hicks}
-          role="User B"
-          statusBarDark={statusBarToneByUserId[hicks.id] === "dark"}
-        >
-          <BookingsScreen
+            role="User A"
+            statusBarDark={statusBarToneByUserId[arabel.id] === "dark"}
+          >
+            <BookingsScreen {...bookingsScreenPropsFor(arabel)} />
+          </PhoneFrame>
+          <PhoneFrame
             user={hicks}
-            bookings={bookingsForUser(hicks.id)}
-            pendingInvitations={pendingInvitationsForUser(hicks.id)}
-            friends={hicksFriends}
-            shares={shares}
-            phoneGiftsUsed={phoneGiftsUsedBy(hicks.id)}
-            phoneGiftLimit={OUTSIDER_GIFT_LIMIT}
-            onShare={handleShare}
-            onAcceptShare={handleAcceptShare}
-            onDeclineShare={handleDeclineShare}
-            onCreateBooking={({ deal }) =>
-              handleCreateBooking({ userId: hicks.id, deal })
-            }
-            onRedeemBooking={handleRedeemBooking}
-            onSaveReview={handleSaveReview}
-            bookmarkedListIds={bookmarksByUserId[hicks.id] ?? []}
-            onToggleListBookmark={(listId) =>
-              handleToggleListBookmark(hicks.id, listId)
-            }
-            onSetStatusBarTone={(tone) =>
-              handleSetStatusBarTone(hicks.id, tone)
-            }
-            interactive
-          />
-        </PhoneFrame>
+            role="User B"
+            statusBarDark={statusBarToneByUserId[hicks.id] === "dark"}
+          >
+            <BookingsScreen {...bookingsScreenPropsFor(hicks)} />
+          </PhoneFrame>
+        </div>
+      </main>
+
+      {/* Mobile layout — the active user's phone fills the viewport,
+          no bezel. Tapping the flip FAB does a 3D card flip on the
+          whole screen to reveal the other user. AnimatePresence keeps
+          both halves of the flip mounted just long enough to perform
+          the cross-over; backfaceVisibility hides each side at the
+          midpoint so the screens swap seamlessly. */}
+      <div
+        className="md:hidden fixed inset-0"
+        style={{ perspective: "1400px" }}
+      >
+        <AnimatePresence mode="sync" initial={false}>
+          <motion.div
+            key={mobileActiveUserId}
+            initial={{ rotateY: 180 }}
+            animate={{ rotateY: 0 }}
+            exit={{ rotateY: -180 }}
+            transition={{ duration: 0.55, ease: [0.42, 0, 0.58, 1] }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              transformStyle: "preserve-3d",
+              backfaceVisibility: "hidden",
+              WebkitBackfaceVisibility: "hidden",
+            }}
+          >
+            <PhoneFrame
+              naked
+              statusBarDark={
+                statusBarToneByUserId[mobileActiveUser.id] === "dark"
+              }
+            >
+              <BookingsScreen {...bookingsScreenPropsFor(mobileActiveUser)} />
+            </PhoneFrame>
+          </motion.div>
+        </AnimatePresence>
       </div>
-    </main>
+      <div className="md:hidden">
+        <FlipButton
+          currentUser={mobileActiveUser}
+          highlight={mobileOtherHasUnread}
+          onClick={() => setMobileActiveUserId(mobileOtherUser.id)}
+        />
+      </div>
+
+      <IntroModal visible={introOpen} onClose={() => setIntroOpen(false)} />
+      <Loader visible={loading} />
+    </>
+  );
+}
+
+// Floating flip button — bottom-left FAB. Shows the CURRENT user's
+// avatar so the UI reads as "you're viewing X"; tapping flips to the
+// other user. When the other user has a fresh inbound share a small
+// red "!" badge sits on top-right of the FAB instead of a neutral dot.
+function FlipButton({ currentUser, highlight, onClick }) {
+  if (!currentUser) return null;
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      aria-label="Flip to the other user's screen"
+      whileTap={{ scale: 0.92, rotate: 180 }}
+      transition={{ type: "spring", stiffness: 360, damping: 22 }}
+      className="fixed bottom-3 left-3 z-60 w-14 h-14 rounded-full bg-white shadow-[0_4px_16px_-4px_rgba(0,0,0,0.35)] border border-black/5 flex items-center justify-center active:scale-95"
+    >
+      <Avatar
+        initials={currentUser.initials}
+        color={currentUser.avatarColor}
+        image={currentUser.avatarImage}
+        size={44}
+      />
+      {highlight && (
+        <span
+          aria-label="Other user has a new notification"
+          className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-error text-white text-[12px] font-bold flex items-center justify-center ring-2 ring-white leading-none"
+        >
+          !
+        </span>
+      )}
+    </motion.button>
   );
 }
 

@@ -59,6 +59,8 @@ export function BookingsScreen({
   bookmarkedListIds = [],
   onToggleListBookmark,
   onSetStatusBarTone,
+  notificationsSeenAt: notificationsSeenAtProp,
+  onMarkNotificationsSeen,
   interactive = true,
 }) {
   // flow = null | { booking, type: 'gift' | 'dine', step: 'pick' | 'message', friends?: User[] }
@@ -311,11 +313,17 @@ export function BookingsScreen({
   }, [shares, user.id]);
 
   // Timestamp of the last bell tap. Anything newer than this is "unread"
-  // and lights the red dot on the bell. Tapping the bell again refreshes
-  // the timestamp, so the badge clears and only re-lights when a fresh
-  // share arrives. Starts at 0 so the seed data does light the badge on
-  // first load.
-  const [notificationsSeenAt, setNotificationsSeenAt] = useState(0);
+  // and lights the red dot on the bell. Now lifted to App via props so
+  // the mobile flip-button can highlight when the OTHER user has a
+  // fresh share. Tapping the bell calls `onMarkNotificationsSeen(now)`
+  // upstream; we fall back to local state when the parent doesn't wire
+  // it (kept so the component still works standalone).
+  const [localSeenAt, setLocalSeenAt] = useState(0);
+  const notificationsSeenAt = notificationsSeenAtProp ?? localSeenAt;
+  function setNotificationsSeenAt(ts) {
+    if (onMarkNotificationsSeen) onMarkNotificationsSeen(ts);
+    else setLocalSeenAt(ts);
+  }
   const hasNotifications = notifications.some((n) => {
     const ts = n.share.lastUpdatedAt ?? n.share.createdAt ?? 0;
     return ts > notificationsSeenAt;
@@ -544,6 +552,7 @@ export function BookingsScreen({
               recommendationsByDealIdForViewer={
                 recommendationsByDealIdForViewer
               }
+              onOpenUser={openUserProfile}
             />
           </motion.div>
         )}
