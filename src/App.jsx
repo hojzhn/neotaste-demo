@@ -250,9 +250,9 @@ function App() {
   }) {
     const ts = Date.now();
     const newShares = [];
+    const createdBookings = [];
     // booking-based shares carry both booking + deal; deal-only shares
     // (originated from a DetailPage Gift) carry just dealId, no bookingId.
-    const bookingId = booking?.id ?? null;
     const dealId = booking?.dealId ?? deal?.id ?? null;
     if (!dealId) return;
     if (phone) {
@@ -261,7 +261,7 @@ function App() {
         fromUserId,
         toUserId: null,
         toPhone: phone,
-        bookingId,
+        bookingId: booking?.id ?? null,
         dealId,
         type,
         message: message || null,
@@ -273,7 +273,25 @@ function App() {
       // Gift and recommend land in the recipient's feed immediately —
       // only dine invitations require accept/decline.
       const status = type === "dine" ? "pending" : "accepted";
+      // Gifting a deal the sender hasn't booked: mint a fresh booking per
+      // recipient so the deal actually lands in their Upcoming. (Without
+      // a bookingId on the share, bookingsForUser has nothing to surface.)
+      const mintBookingPerRecipient = !booking && type === "gift";
       friends.forEach((friend, i) => {
+        let bookingId = booking?.id ?? null;
+        if (mintBookingPerRecipient) {
+          const newBooking = {
+            id: `b-gift-${friend.id}-${ts}-${i}`,
+            userId: friend.id,
+            dealId,
+            dateLabel: copy.bookingConfirmation.defaultDate,
+            timeWindow: copy.bookingConfirmation.defaultTime,
+            status: "upcoming",
+            createdAt: ts,
+          };
+          createdBookings.push(newBooking);
+          bookingId = newBooking.id;
+        }
         newShares.push({
           id: `share-${ts}-${i}`,
           fromUserId,
@@ -290,6 +308,9 @@ function App() {
       });
     }
     if (newShares.length === 0) return;
+    if (createdBookings.length > 0) {
+      setExtraBookings((prev) => [...prev, ...createdBookings]);
+    }
     setShares((prev) => [...prev, ...newShares]);
   }
 

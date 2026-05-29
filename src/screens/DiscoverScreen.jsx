@@ -14,6 +14,7 @@ import {
   Utensils,
   ArrowUpDown,
   Bookmark,
+  Check,
 } from "lucide-react";
 import clsx from "clsx";
 import { Avatar } from "../components/Avatar";
@@ -124,7 +125,7 @@ function MapControls({ browseMode, onToggleBrowseMode }) {
 // One row in the "Browse all deals" drawer — image, name, rating /
 // category / distance, and the deal pills. Whole row is a button when
 // `onOpen` is wired so tapping anywhere jumps to RestaurantDetailPage.
-function RestaurantRow({ restaurant, deals, onOpen }) {
+function RestaurantRow({ restaurant, deals, visited = false, onOpen }) {
   const c = copy.detailPage;
   const Tag = onOpen ? "button" : "article";
   return (
@@ -137,11 +138,21 @@ function RestaurantRow({ restaurant, deals, onOpen }) {
           "cursor-pointer hover:bg-surface/40 active:bg-surface/60 transition-colors",
       )}
     >
-      <img
-        src={restaurant.image}
-        alt=""
-        className="w-14 h-14 rounded-lg object-cover shrink-0"
-      />
+      <div className="relative w-14 h-14 shrink-0">
+        <img
+          src={restaurant.image}
+          alt=""
+          className={clsx(
+            "w-14 h-14 rounded-lg object-cover transition",
+            visited && "contrast-60 opacity-60",
+          )}
+        />
+        {visited && (
+          <span className="absolute bottom-1 right-1 inline-flex items-center justify-center w-5 h-5 rounded-md bg-ink/90 text-white">
+            <Check className="w-2.5 h-2.5" strokeWidth={3} />
+          </span>
+        )}
+      </div>
       <div className="flex-1 min-w-0">
         <h3 className="text-[15px] font-bold text-ink truncate leading-tight">
           {restaurant.name}
@@ -257,6 +268,7 @@ function ListDetailView({
   list,
   listRestaurants,
   viewerId,
+  visitedSet,
   onOpenUser,
   onOpenRestaurant,
   onClose,
@@ -337,6 +349,7 @@ function ListDetailView({
             key={restaurant.id}
             restaurant={restaurant}
             deals={dealsByRestaurantId[restaurant.id] ?? []}
+            visited={visitedSet?.has(restaurant.id) ?? false}
             onOpen={onOpenRestaurant ? () => onOpenRestaurant(restaurant.id) : undefined}
           />
         ))}
@@ -355,6 +368,7 @@ function BrowseSheetContent({
   selectedList,
   listRestaurants,
   viewerId,
+  visitedSet,
   onSelectList,
   onOpenUser,
   onOpenRestaurant,
@@ -381,6 +395,7 @@ function BrowseSheetContent({
               list={selectedList}
               listRestaurants={listRestaurants}
               viewerId={viewerId}
+              visitedSet={visitedSet}
               onOpenUser={onOpenUser}
               onOpenRestaurant={onOpenRestaurant}
               onClose={onCloseList}
@@ -419,6 +434,7 @@ function BrowseSheetContent({
                         key={restaurant.id}
                         restaurant={restaurant}
                         deals={deals}
+                        visited={visitedSet?.has(restaurant.id) ?? false}
                         onOpen={
                           onOpenRestaurant
                             ? () => onOpenRestaurant(restaurant.id)
@@ -748,11 +764,19 @@ function getDiscoverLists(user, bookmarkedListIds) {
 export function DiscoverScreen({
   user,
   bookmarkedListIds = [],
+  visitedRestaurantIds,
   recommendationsByDealIdForViewer = recommendationsByDealId,
   onOpenUser,
   onOpenRestaurant,
   onToggleListBookmark,
 }) {
+  const visitedSet = useMemo(
+    () =>
+      visitedRestaurantIds instanceof Set
+        ? visitedRestaurantIds
+        : new Set(visitedRestaurantIds ?? []),
+    [visitedRestaurantIds],
+  );
   const [selectedId, setSelectedId] = useState(null);
   const [selectedListId, setSelectedListId] = useState(null);
   const [browseMode, setBrowseMode] = useState("deals");
@@ -987,6 +1011,7 @@ export function DiscoverScreen({
             selectedList={selectedList}
             listRestaurants={listRestaurants}
             viewerId={user?.id}
+            visitedSet={visitedSet}
             onSelectList={handleSelectList}
             onOpenUser={onOpenUser}
             onOpenRestaurant={onOpenRestaurant}

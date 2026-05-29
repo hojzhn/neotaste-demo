@@ -23,10 +23,24 @@ export function Pin({
   const interactive = !!onClick;
   const Tag = interactive ? "button" : "span";
   const isRecommended = recommendationCount > 0;
-  const fill = selected
-    ? "var(--color-brand-dark)"
-    : "var(--color-brand)";
-  const nFill = selected ? "var(--color-brand)" : "var(--color-brand-darker)";
+  // Recommended pins ride the Spirulina ramp (400 default → 700 selected)
+  // with .900 as the dark accent. Plain pins keep the brand-green pair.
+  // Spirulina.700 (#0061a7) and .900 (#084572) aren't theme tokens yet —
+  // see neotaste-design-system.md §Spirulina.
+  const fill = isRecommended
+    ? selected
+      ? "#0061a7"
+      : "var(--color-verified)"
+    : selected
+      ? "var(--color-brand-dark)"
+      : "var(--color-brand)";
+  const nFill = isRecommended
+    ? selected
+      ? "var(--color-verified)"
+      : "#084572"
+    : selected
+      ? "var(--color-brand)"
+      : "var(--color-brand-darker)";
   const inkFill = "var(--color-ink)";
   return (
     <Tag
@@ -97,14 +111,15 @@ export function Pin({
         )}
       </svg>
 
-      {/* ThumbsUp swap when recommended — centred in the head. */}
+      {/* ThumbsUp swap when recommended — centred in the head. Reuses
+          nFill so the icon flips light/dark in sync with the body. */}
       {isRecommended && (
         <span className="absolute left-1/2 top-1.25 -translate-x-1/2 pointer-events-none">
           <ThumbsUp
             className="w-3.5 h-3.5"
             strokeWidth={2.5}
-            fill="var(--color-brand-darker)"
-            stroke="var(--color-brand-darker)"
+            fill={nFill}
+            stroke={nFill}
           />
         </span>
       )}
@@ -113,7 +128,8 @@ export function Pin({
           White ring keeps it separated from the pin body. */}
       {isRecommended && (
         <span
-          className="absolute -top-1 -right-1 inline-flex items-center justify-center h-3.5 min-w-3.5 px-1 rounded-full bg-brand-darker text-white text-[9px] font-bold leading-none ring-2 ring-white pointer-events-none"
+          className="absolute -top-1 -right-1 inline-flex items-center justify-center h-3.5 min-w-3.5 px-1 rounded-full text-white text-[9px] font-bold leading-none ring-2 ring-white pointer-events-none"
+          style={{ backgroundColor: "#084572" }}
           aria-label={`${recommendationCount} recommendations`}
         >
           {recommendationCount}

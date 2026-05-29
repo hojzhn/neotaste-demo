@@ -106,9 +106,25 @@ export function Toast({
   const titleFn = isReceived ? titles.received : titles.sent;
   if (!titleFn) return null;
   const title = titleFn(who);
+  // Wrap the recipient/sender segment in brand-green so the person reads
+  // first. `who` always appears verbatim in the rendered title (it's
+  // interpolated into the copy template), so a simple split is enough.
+  const whoIdx = who ? title.indexOf(who) : -1;
+  const titleNode =
+    whoIdx === -1 ? (
+      title
+    ) : (
+      <>
+        {title.slice(0, whoIdx)}
+        <span className="text-brand">
+          {title.slice(whoIdx, whoIdx + who.length)}
+        </span>
+        {title.slice(whoIdx + who.length)}
+      </>
+    );
 
   return (
-    <div className="absolute top-1 md:top-12 inset-x-3 z-50 animate-[slidedown_220ms_ease-out]">
+    <div className="absolute top-1 md:top-12 inset-x-3 z-101 animate-[slidedown_220ms_ease-out]">
       <div className="bg-brand-darker text-white rounded-md shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] p-3 flex items-center gap-3">
         {isReceived ? (
           <ReceivedIcon fromUser={fromUser} type={type} />
@@ -116,7 +132,7 @@ export function Toast({
           <SentIcon />
         )}
         <div className="flex-1 min-w-0 pt-1">
-          <p className="text-[14px] font-semibold leading-snug">{title}</p>
+          <p className="text-[14px] font-semibold leading-snug">{titleNode}</p>
           {message && (
             <p className="text-[13px] text-white/80 mt-0.5 leading-snug">
               “{message}”
